@@ -1,0 +1,39 @@
+# Build/config
+.vscode/**
+.vscode-test/**
+node_modules/**
+tsconfig.json
+vitest.config.ts
+.env
+*.vsix
+
+# Source (compiled JS goes in out/)
+src/**
+test/**
+playground/**
+ashibalt-server/**
+
+# Large/dev-only folders
+opencode/**
+Other/**
+logs-session/**
+research/**
+
+# Misc
+Исследование.md
+Задачи.md
+RoadMap.md
+BUILD.md
+logs.txt
+ы.txt
+CHANGELOG
+.gitignore
+.git/**
+__pycache__/**
+ashlight-metrics-server/**
+
+# Extra READMEs (main README.md is kept)
+README.hy.md
+
+# Stray files in icon_providers
+icon_providers/response.html

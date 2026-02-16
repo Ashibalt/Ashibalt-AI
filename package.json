@@ -1,0 +1,276 @@
+{
+  "name": "ashibalt-ai",
+  "displayName": "Ashibalt AI",
+  "description": "AI-агент для написания кода в VS Code. Agent-режим, мульти-провайдер (OpenRouter, Ollama, Mistral, DeepSeek), snapshot-система. | AI coding agent for VS Code. BETA.",
+  "version": "0.1.0",
+  "publisher": "Ashibalt",
+  "license": "MIT",
+  "icon": "icon_providers/icon_main.png",
+  "preview": true,
+  "pricing": "Free",
+  "homepage": "https://github.com/Ashibalt-AI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ashibalt-AI/ashibalt-ai"
+  },
+  "bugs": {
+    "url": "https://github.com/Ashibalt-AI/ashibalt-ai/issues"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "copilot",
+    "coding-assistant",
+    "openrouter",
+    "ollama",
+    "llm",
+    "deepseek",
+    "gemini",
+    "mistral"
+  ],
+  "engines": {
+    "vscode": "^1.106.0"
+  },
+  "categories": [
+    "AI",
+    "Machine Learning",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.106.1",
+    "@vscode/test-electron": "^2.5.0",
+    "typescript": "^5.5.0",
+    "vitest": "^4.0.12"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.43",
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-bash": "^0.25.0",
+    "tree-sitter-c": "^0.21.0",
+    "tree-sitter-cpp": "^0.22.0",
+    "tree-sitter-css": "^0.25.0",
+    "tree-sitter-go": "^0.21.0",
+    "tree-sitter-html": "^0.23.2",
+    "tree-sitter-java": "^0.21.0",
+    "tree-sitter-json": "^0.21.0",
+    "tree-sitter-php": "^0.24.2",
+    "tree-sitter-python": "^0.21.0",
+    "tree-sitter-ruby": "^0.21.0",
+    "tree-sitter-rust": "^0.21.0",
+    "tree-sitter-typescript": "^0.23.2",
+    "undici": "^7.0.0"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Ashibalt AI",
+      "properties": {
+        "ashibaltAi.endpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "URL of the local Ollama inference server (e.g. http://127.0.0.1:11434)."
+        },
+        "ashibaltAi.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model name for Ollama inference. Models are fetched dynamically from the saved list."
+        },
+        "ashibaltAi.maxTokens": {
+          "type": "number",
+          "default": 8192,
+          "minimum": 8192,
+          "maximum": 16384,
+          "description": "Maximum number of tokens to generate per completion."
+        },
+        "ashibaltAi.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Sampling temperature for the model. Higher = more creative, lower = more precise."
+        },
+        "ashibaltAi.agentIterations": {
+          "type": "number",
+          "default": 5,
+          "minimum": 5,
+          "maximum": 50,
+          "description": "Maximum number of agent iterations per request."
+        },
+        "ashibaltAi.autoRunTerminal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run terminal commands without confirmation."
+        },
+        "ashibaltAi.metricsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable anonymous usage metrics tracking."
+        },
+        "ashibaltAi.provider": {
+          "type": "string",
+          "enum": [
+            "ollama",
+            "mistral",
+            "openrouter",
+            "openai",
+            "claude",
+            "deepseek",
+            "grok",
+            "gemini"
+          ],
+          "default": "openrouter",
+          "description": "LLM provider: Ollama, Mistral, OpenRouter, OpenAI, Claude, DeepSeek, Grok, or Gemini."
+        },
+        "ashibaltAi.ollamaBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "URL of the Ollama server for local models."
+        },
+        "ashibaltAi.openRouterBaseUrl": {
+          "type": "string",
+          "default": "https://openrouter.ai/api/v1",
+          "description": "OpenRouter API base URL."
+        },
+        "ashibaltAi.openRouterApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API-ключ OpenRouter (BYOK). Получите на openrouter.ai/keys"
+        },
+        "ashibaltAi.chatModel": {
+          "type": "string",
+          "default": "",
+          "description": "Specific model for Chat (overrides default)."
+        },
+        "ashibaltAi.refactorModel": {
+          "type": "string",
+          "default": "",
+          "description": "Specific model for Refactoring (overrides default)."
+        },
+        "ashibaltAi.autocompleteModel": {
+          "type": "string",
+          "default": "",
+          "description": "Specific model for Autocomplete (overrides default)."
+        },
+        "ashibaltAi.refactorMaxTokens": {
+          "type": "number",
+          "default": 1024,
+          "minimum": 256,
+          "maximum": 4096,
+          "description": "Maximum number of tokens for refactoring responses."
+        },
+        "ashibaltAi.providerSettings": {
+          "type": "object",
+          "default": {},
+          "description": "Per-provider URL and API key overrides. Managed via the Settings panel.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "apiKey": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "ashibaltAi.reloadSettings",
+        "title": "Reload Ashibalt AI"
+      },
+      {
+        "command": "ashibaltAi.explainCode",
+        "title": "Ashibalt: Explain Code"
+      },
+      {
+        "command": "ashibaltAi.refactorCode",
+        "title": "Ashibalt: Refactor Code"
+      },
+      {
+        "command": "ashibaltAi.showConfigPath",
+        "title": "Ashibalt: Show Config File Location"
+      },
+      {
+        "command": "ashibalt.keepChange",
+        "title": "Ashibalt: Keep Change"
+      },
+      {
+        "command": "ashibalt.undoChange",
+        "title": "Ashibalt: Undo Change"
+      },
+      {
+        "command": "ashibalt.keepAllChanges",
+        "title": "Ashibalt: Keep All Changes"
+      },
+      {
+        "command": "ashibalt.undoAllChanges",
+        "title": "Ashibalt: Undo All Changes"
+      },
+      {
+        "command": "ashibalt.showDiff",
+        "title": "Ashibalt: Show Diff"
+      },
+      {
+        "command": "ashibalt.acceptCurrentFile",
+        "title": "Ashibalt: Accept All Changes in Current File"
+      },
+      {
+        "command": "ashibalt.rejectCurrentFile",
+        "title": "Ashibalt: Reject All Changes in Current File"
+      },
+      {
+        "command": "ashibalt.diffCurrentFile",
+        "title": "Ashibalt: Show Diff for Current File"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "ashibaltAi.refactorCode",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorHasSelection"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "ashibaltAi.explainCode",
+          "group": "navigation",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "ashibaltAi.refactorCode",
+          "group": "navigation",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ashibalt-sidebar",
+          "title": "Ashibalt AI",
+          "icon": "icon_providers/sun-medium.svg"
+        }
+      ]
+    },
+    "views": {
+      "ashibalt-sidebar": [
+        {
+          "type": "webview",
+          "id": "ashibalt.chatView",
+          "name": ""
+        }
+      ]
+    }
+  }
+}
