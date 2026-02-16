@@ -440,15 +440,8 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
               `The file content was too large to send in a single tool call. ` +
               `Please split the file into smaller parts: first create_file with a skeleton, then use edit_file with start_line/end_line to add content section by section.`;
             
-            conversationMessages.push({
-              role: 'assistant',
-              content: response.content || '',
-              tool_calls: response.tool_calls?.map(tc => ({
-                id: tc.id,
-                type: tc.type as 'function',
-                function: { name: tc.function.name, arguments: tc.function.arguments }
-              }))
-            });
+            // Assistant message with tool_calls was already pushed above (line ~349).
+            // Only push the tool result — do NOT push another assistant message.
             conversationMessages.push({
               role: 'tool',
               tool_call_id: toolCall.id,
@@ -481,15 +474,8 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
           `Please use the information you already have, or use a different tool. ` +
           `The counter resets when you use any other tool.`;
         
-        conversationMessages.push({
-          role: 'assistant',
-          content: response.content || '',
-          tool_calls: response.tool_calls?.map(tc => ({
-            id: tc.id,
-            type: tc.type as 'function',
-            function: { name: tc.function.name, arguments: tc.function.arguments }
-          }))
-        });
+        // Assistant message with tool_calls was already pushed above (line ~349).
+        // Only push the tool result — do NOT push another assistant message.
         conversationMessages.push({
           role: 'tool',
           tool_call_id: toolCall.id,

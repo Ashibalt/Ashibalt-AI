@@ -4,6 +4,14 @@ import * as os from 'os';
 import { ExtensionContext } from 'vscode';
 import { logger } from '../logger';
 
+/**
+ * Sanitize sessionId to prevent path traversal attacks.
+ * Only allows alphanumeric characters, hyphens, and underscores.
+ */
+function sanitizeSessionId(sessionId: string): string {
+  return sessionId.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
 // Action types for sequential message content
 export interface TextAction {
   type: 'text';
@@ -207,6 +215,7 @@ export class StorageManager {
   }
 
   async sessionExists(sessionId: string) {
+    sessionId = sanitizeSessionId(sessionId);
     const messagesPath = path.join(this.sessionsDir, sessionId, 'messages.jsonl');
     try {
       await fs.access(messagesPath);
@@ -221,6 +230,7 @@ export class StorageManager {
   }
 
   async createSession(sessionId: string, title?: string) {
+    sessionId = sanitizeSessionId(sessionId);
     const dir = path.join(this.sessionsDir, sessionId);
     await fs.mkdir(dir, { recursive: true });
     const messagesPath = path.join(dir, 'messages.jsonl');
@@ -239,6 +249,7 @@ export class StorageManager {
   }
 
   async appendMessage(sessionId: string, message: StoredMessage) {
+    sessionId = sanitizeSessionId(sessionId);
     const dir = path.join(this.sessionsDir, sessionId);
     await fs.mkdir(dir, { recursive: true });
     const messagesPath = path.join(dir, 'messages.jsonl');
@@ -251,6 +262,7 @@ export class StorageManager {
    * Rewrites the file without the target message.
    */
   async removeMessage(sessionId: string, messageId: string): Promise<void> {
+    sessionId = sanitizeSessionId(sessionId);
     const messagesPath = path.join(this.sessionsDir, sessionId, 'messages.jsonl');
     try {
       const raw = await fs.readFile(messagesPath, 'utf8');
@@ -272,6 +284,7 @@ export class StorageManager {
   // ---- Session metrics persistence ----
 
   async saveSessionMetrics(sessionId: string, metrics: { inputTokens: number; outputTokens: number; apiCalls: number; currentContextTokens?: number; contextLimit?: number }) {
+    sessionId = sanitizeSessionId(sessionId);
     const dir = path.join(this.sessionsDir, sessionId);
     await fs.mkdir(dir, { recursive: true });
     const metricsPath = path.join(dir, 'metrics.json');
@@ -280,6 +293,7 @@ export class StorageManager {
   }
 
   async loadSessionMetrics(sessionId: string): Promise<{ inputTokens: number; outputTokens: number; apiCalls: number; currentContextTokens?: number; contextLimit?: number }> {
+    sessionId = sanitizeSessionId(sessionId);
     const metricsPath = path.join(this.sessionsDir, sessionId, 'metrics.json');
     try {
       const raw = await fs.readFile(metricsPath, 'utf8');
@@ -292,6 +306,7 @@ export class StorageManager {
   // ---- API conversation persistence (full tool_calls + tool results) ----
 
   async saveApiConversation(sessionId: string, conversation: any[]) {
+    sessionId = sanitizeSessionId(sessionId);
     const dir = path.join(this.sessionsDir, sessionId);
     await fs.mkdir(dir, { recursive: true });
     const convPath = path.join(dir, 'conversation.json');
@@ -300,6 +315,7 @@ export class StorageManager {
   }
 
   async loadApiConversation(sessionId: string): Promise<any[]> {
+    sessionId = sanitizeSessionId(sessionId);
     const convPath = path.join(this.sessionsDir, sessionId, 'conversation.json');
     try {
       const raw = await fs.readFile(convPath, 'utf8');
@@ -315,6 +331,7 @@ export class StorageManager {
   // ---- Session mode lock (agent/chat) ----
 
   async saveSessionMode(sessionId: string, mode: string) {
+    sessionId = sanitizeSessionId(sessionId);
     const dir = path.join(this.sessionsDir, sessionId);
     await fs.mkdir(dir, { recursive: true });
     const modePath = path.join(dir, 'mode.json');
@@ -322,6 +339,7 @@ export class StorageManager {
   }
 
   async loadSessionMode(sessionId: string): Promise<string | null> {
+    sessionId = sanitizeSessionId(sessionId);
     const modePath = path.join(this.sessionsDir, sessionId, 'mode.json');
     try {
       const raw = await fs.readFile(modePath, 'utf8');
@@ -333,6 +351,7 @@ export class StorageManager {
   }
 
   async readSessionTail(sessionId: string, maxLines = 200): Promise<StoredMessage[]> {
+    sessionId = sanitizeSessionId(sessionId);
     const messagesPath = path.join(this.sessionsDir, sessionId, 'messages.jsonl');
     try {
       const raw = await fs.readFile(messagesPath, 'utf8');
@@ -398,6 +417,7 @@ export class StorageManager {
    * Clear all messages in a session but keep the session itself
    */
   async clearSession(sessionId: string) {
+    sessionId = sanitizeSessionId(sessionId);
     const messagesPath = path.join(this.sessionsDir, sessionId, 'messages.jsonl');
     try {
       // Truncate the messages file
@@ -409,6 +429,7 @@ export class StorageManager {
   }
 
   async deleteSession(sessionId: string) {
+    sessionId = sanitizeSessionId(sessionId);
     const dir = path.join(this.sessionsDir, sessionId);
     try {
       // remove session folder and its contents

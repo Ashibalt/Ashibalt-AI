@@ -1083,12 +1083,13 @@ export class ChatViewProvider implements WebviewViewProvider {
     });
 
     // Listen for active editor changes to update the UI
-    window.onDidChangeActiveTextEditor(editor => {
+    const editorChangeDisposable = window.onDidChangeActiveTextEditor(editor => {
       if (this.view && editor) {
         const filename = editor.document.fileName.split(/[\\/]/).pop();
         this.postMessage({ type: 'setCurrentFile', value: filename });
       }
     });
+    webviewView.onDidDispose(() => editorChangeDisposable.dispose());
 
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {

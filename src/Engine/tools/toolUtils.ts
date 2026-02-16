@@ -2,11 +2,26 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 /**
- * Strip ANSI escape codes from terminal output for cleaner model input
+ * Strip ANSI escape codes and OSC sequences from terminal output for cleaner model input.
+ * Handles CSI sequences (\x1b[...), OSC sequences (\x1b]...\x07 / \x1b]...\x1b\\),
+ * and standalone control characters.
  */
 export function stripAnsi(str: string): string {
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+  return str
+    // OSC sequences: \x1b]...\x07 or \x1b]...\x1b\\ (VS Code shell integration injects these)
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, '')
+    // CSI sequences: \x1b[...X
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
+    // Other ESC sequences: \x1bX (single char after ESC)
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1B[@-Z\\-_]/g, '')
+    // BEL, carriage return noise
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x07\x00]/g, '')
+    // Clean up resulting blank lines
+    .replace(/^\s*\n/gm, '');
 }
 
 /**

@@ -348,7 +348,13 @@ export async function webSearchTool(args: any): Promise<any> {
     throw new Error('web_search requires "query" parameter');
   }
   
-  const apiKey = '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';
+  const apiKey = vscode.workspace.getConfiguration('ashibaltAi').get<string>('tavilyApiKey', '');
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Tavily API key not configured. Set "ashibaltAi.tavilyApiKey" in VS Code settings.'
+    };
+  }
   
   const query = args.query;
   const maxResults = Math.min(Math.max(1, args.max_results || 5), 10);

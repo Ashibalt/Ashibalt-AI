@@ -244,17 +244,17 @@ export async function runTerminalCommandTool(args: any, workspaceRoot?: string):
         // IMPORTANT: don't time out while command is still producing output.
         // We apply idle timeout (no output chunks) to avoid hanging forever on silent commands.
         const stream = execution.read();
-        let output = '';
+        let rawOutput = '';
         let lastChunkTime = nowMs();
         const startedAt = nowMs();
         const maxTotalMs = 60 * 60 * 1000; // 1h safety cap to avoid truly stuck processes
         
         for await (const chunk of stream) {
-          output += chunk;
+          rawOutput += chunk;
           lastChunkTime = nowMs();
           // Prevent huge output
-          if (output.length > 50000) {
-            output = output.substring(0, 10000) + '\n... (output truncated)';
+          if (rawOutput.length > 50000) {
+            rawOutput = rawOutput.substring(0, 10000) + '\n... (output truncated)';
             break;
           }
 
@@ -266,11 +266,29 @@ export async function runTerminalCommandTool(args: any, workspaceRoot?: string):
               cwd,
               error: `Command exceeded maximum total duration (${maxTotalMs}ms)` ,
               timed_out: true,
-              output: output.substring(0, 10000),
+              output: stripAnsi(rawOutput).substring(0, 10000),
               method: 'vscode_terminal'
             } satisfies TerminalRunResult;
           }
         }
+
+        // Strip ANSI/OSC sequences from shell integration output
+        let output = stripAnsi(rawOutput);
+
+        // Remove the echoed command itself from the beginning of the output
+        // Shell integration often echoes: cd "path" && actual_command\n...output...
+        const echoIdx = output.indexOf(finalCommand);
+        if (echoIdx !== -1 && echoIdx < 200) {
+          output = output.substring(echoIdx + finalCommand.length).replace(/^\r?\n/, '');
+        }
+        // Also try removing the full command (with cd prefix)
+        const fullEchoIdx = output.indexOf(fullCommand);
+        if (fullEchoIdx !== -1 && fullEchoIdx < 200) {
+          output = output.substring(fullEchoIdx + fullCommand.length).replace(/^\r?\n/, '');
+        }
+
+        // Trim leading/trailing whitespace and empty lines
+        output = output.trim();
 
         // If we exited the stream quickly but the command went silent/hung, detect by idle timeout.
         if (idleTimeoutMs > 0 && nowMs() - lastChunkTime > idleTimeoutMs) {
@@ -502,12 +520,13 @@ async function startBackgroundCommand(finalCommand: string, cwd: string, origina
     backgroundProcess = null;
   });
 
-  // Also show in VS Code terminal for user visibility
+  // Show in VS Code terminal for user visibility (read-only — actual execution is via child_process)
   if (!agentTerminal || agentTerminal.exitStatus !== undefined) {
     agentTerminal = vscode.window.createTerminal({ name: 'Ashibalt Agent', cwd });
   }
   agentTerminal.show(true);
-  agentTerminal.sendText(originalCommand);
+  // NOTE: Do NOT call sendText here — the command is already running via child_process.
+  // sendText would execute it a second time, causing double execution (e.g. two servers).
 
   // Wait briefly (3s) for initial output
   await new Promise(resolve => setTimeout(resolve, 3000));
