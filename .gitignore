@@ -30,3 +30,8 @@ playground/
 opencode/
 Other/
 OpenAgent-main/
+
+# Generated assets (copied from node_modules at build time)
+media/codicon.css
+media/codicon.ttf
+

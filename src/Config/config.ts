@@ -20,7 +20,6 @@ export const PROVIDER_DEFAULTS: Record<ProviderType, { url: string }> = {
 };
 
 export interface ExtensionConfig {
-  maxTokens: number;
   openRouterApiKey: string;
   openRouterBaseUrl: string;
   ollamaBaseUrl: string;
@@ -30,7 +29,6 @@ export interface ExtensionConfig {
 
 export function loadExtensionConfig(): ExtensionConfig {
   const config = workspace.getConfiguration("ashibaltAi");
-  const maxTokens = config.get<number>("maxTokens", 4096);
   const openRouterBaseUrl = config.get<string>("openRouterBaseUrl", "https://openrouter.ai/api/v1");
   const ollamaBaseUrl = config.get<string>("ollamaBaseUrl", "http://localhost:11434");
   const openRouterApiKey = config.get<string>("openRouterApiKey", "");
@@ -48,7 +46,6 @@ export function loadExtensionConfig(): ExtensionConfig {
   }
 
   return {
-    maxTokens,
     openRouterApiKey,
     openRouterBaseUrl,
     ollamaBaseUrl,

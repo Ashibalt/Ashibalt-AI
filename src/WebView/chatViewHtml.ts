@@ -19,15 +19,15 @@ export function loadHtmlTemplate(webview: Webview, nonce: string, currentFileNam
     const autoRunTerminal = cfg.get('autoRunTerminal', false);
     const provider = cfg.get('provider', 'openrouter');
 
-    const htmlPath = Uri.joinPath(extensionUri, 'src', 'WebView', 'chatView.html');
+    const htmlPath = Uri.joinPath(extensionUri, 'media', 'chatView.html');
     logger.log(`Loading chat view from: ${htmlPath.fsPath}`);
     const htmlBytes = require('fs').readFileSync(htmlPath.fsPath, 'utf8');
-    const codiconUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'));
+    const codiconUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'media', 'codicon.css'));
     const markedUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'resources', 'js', 'marked.min.js'));
     const highlightUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'resources', 'js', 'highlight.min.js'));
     const highlightCssUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'resources', 'css', 'github-dark.min.css'));
-    const styleUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'src', 'WebView', 'style.css'));
-    const scriptUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'src', 'WebView', 'script.js'));
+    const styleUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'media', 'style.css'));
+    const scriptUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'media', 'script.js'));
     const iconsUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'resources', 'icons'));
     const providerIconsUri = webview.asWebviewUri(Uri.joinPath(extensionUri, 'icon_providers'));
 
@@ -46,7 +46,6 @@ export function loadHtmlTemplate(webview: Webview, nonce: string, currentFileNam
       .replace(/\{\{iconsUri\}\}/g, iconsUri.toString())
       .replace(/\{\{providerIconsUri\}\}/g, providerIconsUri.toString())
       .replace(/\{\{currentFileName\}\}/g, currentFileName || 'No file')
-      .replace(/\{\{maxTokens\}\}/g, String(config.maxTokens || 4096))
       .replace(/\{\{agentIterations\}\}/g, String(agentIterations))
       .replace(/\{\{autoRunTerminalChecked\}\}/g, autoRunTerminal ? 'checked' : '')
       .replace(/\{\{provider\}\}/g, provider)
@@ -84,7 +83,7 @@ function getFallbackHtml(webview: Webview, nonce: string) {
     <body>
       <div class="error">
         <h2>Не удалось загрузить интерфейс чата</h2>
-        <p>Проверьте, что файл chatView.html находится в папке src/WebView/</p>
+        <p>Проверьте, что файл chatView.html находится в папке media/</p>
       </div>
     </body>
     </html>`;

@@ -12,12 +12,12 @@
 
 - **Agent-режим** — автономное редактирование кода, создание файлов, запуск терминальных команд, итеративное решение задач через цикл агента
 - **Chat-режим** — AI-ассистент только для чтения с доступом к контексту вашего проекта
-- **4 провайдера** — Ollama (локально), OpenRouter, Mistral, DeepSeek
+- **8 провайдеров** — Ollama (локально, бесплатно), OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Gemini
 - **Браузер моделей** — поиск и добавление моделей прямо из интерфейса
 - **Snapshot-система** — каждая правка файла создаёт снимок с кнопками Accept / Reject в редакторе
-- **11 инструментов** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`
+- **12 инструментов** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`, `web_search`
 - **Синтаксический анализ** — tree-sitter для 14+ языков (TypeScript, Python, Rust, Go, C/C++, Java, Ruby и др.)
-- **Контекст-менеджмент** — сжатие контекста при приближении к лимиту, управление окном контекста (до 128K)
+- **Контекст-менеджмент** — сжатие контекста при приближении к лимиту, управление окном контекста (до 256K)
 - **Метрики** — расход токенов, кэш промптов, использование контекстного окна
 - **Сессии** — история чатов с сохранением, переключением и поиском
 
@@ -50,6 +50,7 @@ src/
 │   ├── agentLoop.ts          # Основной цикл агента (tool calling loop)
 │   ├── agentErrors.ts        # Парсинг ошибок API, восстановление JSON
 │   ├── fetchWithTools.ts     # HTTP-запросы к chat/completions
+│   ├── modelParams.ts        # Единый конфиг параметров модели (temp, top_p, max_tokens)
 │   ├── toolCalling.ts        # Реестр и диспетчер инструментов
 │   ├── diagnosticsEngine.ts  # Tree-sitter синтаксический анализ
 │   ├── sseParser.ts          # Парсер SSE-потока
@@ -89,6 +90,12 @@ src/
     └── metricsService.ts     # Сервис метрик использования
 ```
 
+## Веб-поиск
+
+Инструмент `web_search` использует [Tavily API](https://tavily.com). Для его работы:
+1. Зарегистрируйтесь на [tavily.com](https://tavily.com) и получите бесплатный API-ключ
+2. Вставьте ключ в `src/Engine/tools/webSearchTool.ts` в переменную `apiKey`
+
 ## Приватность
 
 - API-ключи хранятся локально в секретном хранилище VS Code
@@ -101,5 +108,4 @@ MIT — см. файл [LICENSE](LICENSE).
 
 ## Контакты
 
-- [GitHub](https://github.com/Ashibalt-AI)
 - [Поддержать проект](https://dalink.to/ashibalt)

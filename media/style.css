@@ -1001,6 +1001,7 @@ background: #373737;
       bottom: 0;
       z-index: 5;
       flex-shrink: 0;
+      bottom: -12px;
       margin-top: auto;
     }
 

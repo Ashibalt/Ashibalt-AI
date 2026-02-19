@@ -8,7 +8,7 @@
  *   - searchTools.ts       — search, list_files (project tree)
  *   - terminalTool.ts      — terminal command execution
  *   - diagnoseTool.ts      — diagnose (diagnostics)
- *   - disabledTools.ts     — web_search, find_references, run_tests
+ *   - webSearchTool.ts     — web_search (Tavily)
  *   - toolUtils.ts         — shared utilities (resolveFilePath, checkPathSecurity, stripAnsi)
  */
 
@@ -19,7 +19,7 @@ import { searchTool, getProjectTreeTool } from './tools/searchTools';
 import { runTerminalCommandTool, readTerminalOutputTool, writeToTerminalTool } from './tools/terminalTool';
 import { diagnoseTool } from './tools/diagnoseTool';
 import { fetchUrlTool } from './tools/fetchUrlTool';
-import { webSearchTool } from './tools/disabledTools';
+import { webSearchTool } from './tools/webSearchTool';
 import { logger } from '../logger';
 
 export type ToolSpec = {
@@ -264,7 +264,6 @@ Returns the latest output after sending the input.`,
       }
     }
   },
-  // DISABLED: find_references (LSP flaky), run_tests (needs terminal rework)
 ];
 
 /**
@@ -369,11 +368,6 @@ function validateToolArgs(toolName: string, args: any): string | null {
       }
       break;
 
-    // DISABLED TOOLS
-    case 'find_references':
-    case 'run_tests':
-      return `Tool "${toolName}" is currently disabled`;
-
     default:
       break;
   }
@@ -411,15 +405,6 @@ export async function executeTool(toolName: string, args: any, workspaceRoot?: s
   };
 
   logger.log(`[TOOL_DISPATCH] START ${toolName} args=${summarizeArgs(toolName, args)}`);
-  
-  // Check for disabled tools first
-  const disabledTools = ['find_references', 'run_tests'];
-  if (disabledTools.includes(toolName)) {
-    return { 
-      error: `Tool "${toolName}" is currently disabled`,
-      hint: 'This tool is temporarily unavailable. Please use other tools to accomplish your task.'
-    };
-  }
   
   // Validate arguments before execution
   const validationError = validateToolArgs(toolName, args);

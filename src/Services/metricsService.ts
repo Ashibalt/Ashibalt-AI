@@ -1,4 +1,4 @@
-import { fetch } from 'undici';
+
 import { logger } from '../logger';
 import { uidManager } from '../Storage/uidManager';
 
@@ -6,9 +6,10 @@ import { uidManager } from '../Storage/uidManager';
  * ──── METRICS SERVER URL ────
  * Change this constant when deploying to production.
  * Local dev: http://localhost:4200
- * Production: https://metrics.ashibalt.dev
+ * Production: set your server URL here
  */
-export const METRICS_SERVER_URL = 'http://localhost:4200';
+export const METRICS_SERVER_URL = '';
+export const METRICS_API_KEY = '';
 
 const SEND_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
@@ -106,9 +107,14 @@ export class MetricsService {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (METRICS_API_KEY) {
+        headers['Authorization'] = `Bearer ${METRICS_API_KEY}`;
+      }
+
       const res = await fetch(`${this.metricsUrl}/api/metrics`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
         signal: controller.signal,
       });

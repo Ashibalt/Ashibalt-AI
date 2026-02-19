@@ -1,5 +1,5 @@
 import { window, workspace, type Memento } from 'vscode';
-import { fetch } from 'undici';
+
 import { logger } from '../logger';
 import type { ProviderType } from './config';
 

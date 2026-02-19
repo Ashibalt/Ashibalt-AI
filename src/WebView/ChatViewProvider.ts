@@ -1,4 +1,4 @@
-import { commands, Uri, Webview, WebviewView, WebviewViewProvider, window, workspace, ExtensionContext, FileType, Position, Range } from "vscode";
+import { commands, env, Uri, Webview, WebviewView, WebviewViewProvider, window, workspace, ExtensionContext, FileType, Position, Range } from "vscode";
 import { TextDecoder } from "util";
 import { ExtensionConfig, type ProviderType, loadExtensionConfig } from "../Config/config";
 import { logger } from "../logger";
@@ -247,12 +247,29 @@ export class ChatViewProvider implements WebviewViewProvider {
               autoRunTerminal
             });
           }
+          // Wait for history/sessions to be loaded from disk before restoring.
+          // Without this, pendingRestoreSessionId may still be null if
+          // loadHistory() hasn't completed yet — a race condition.
+          await this.historyLoaded;
           // Auto-restore last session (skip snapshot check on startup)
           if (this.pendingRestoreSessionId) {
             const sessionId = this.pendingRestoreSessionId;
             this.pendingRestoreSessionId = null;
             logger.log(`[WebView] Auto-restoring last session: ${sessionId}`);
             this.loadSession(sessionId);
+          }
+          // Send pending snapshots state AFTER webview is fully ready.
+          // Must wait for snapshotManager.init() to complete — otherwise snapshots
+          // haven't been loaded from disk yet and the dashboard shows empty.
+          {
+            const sm = getSnapshotManager();
+            sm.ready().then(() => {
+              this.snapshots.sendUpdate();
+              logger.log(`[WebView] Snapshot dashboard sent on webviewReady. hasPending=${sm.hasPendingChanges()}`);
+            }).catch(() => {
+              // Fallback: send anyway even if init failed
+              this.snapshots.sendUpdate();
+            });
           }
           break;
         case "sendMessage":
@@ -464,6 +481,26 @@ export class ChatViewProvider implements WebviewViewProvider {
         case "forgetMessages": {
            if (Array.isArray(message.ids) && message.ids.length > 0) {
              const idsToForget = new Set(message.ids.map(String));
+
+             // Rollback file snapshots for assistant messages being removed
+             const sm = getSnapshotManager();
+             const pendingSnapshots = sm.getPendingSnapshots();
+             for (const msg of this.history) {
+               if (msg.role === 'assistant' && msg.id && idsToForget.has(String(msg.id)) && (msg as any).actions) {
+                 const fileActions = ((msg as any).actions as any[]).filter((a: any) =>
+                   a.type === 'edit_file' || a.type === 'create_file' || a.type === 'delete_file'
+                 );
+                 for (const fa of fileActions) {
+                   if (fa.filePath) {
+                     const snap = pendingSnapshots.find(s => s.filePath === fa.filePath);
+                     if (snap) {
+                       await sm.rollbackSnapshot(snap.id).catch(err => logger.error('Rollback on forgetMessages failed:', err));
+                     }
+                   }
+                 }
+               }
+             }
+
              this.history = this.history.filter(m => !m.id || !idsToForget.has(String(m.id)));
              this.saveHistory();
 
@@ -600,37 +637,8 @@ export class ChatViewProvider implements WebviewViewProvider {
           break;
         }
         case "sendFeedback": {
-          try {
-            const { fetch: undFetch } = await import('undici');
-            const webhookUrl = 'https://discord.com/api/webhooks/1470318751697207359/NC8ko_pwPPhUiW7e4g-Y14gR98Ljfavb7a49mZyJDq_zDUWPbt2woGscXTEHQ9CWHeP3';
-            const embed = {
-              title: '🐛 Баг-репорт Ashibalt AI',
-              color: 0x89b4fa,
-              fields: [
-                { name: 'Описание', value: message.description || 'Не указано' },
-                { name: 'Провайдер', value: message.provider || '—', inline: true },
-                { name: 'Модель', value: message.model || '—', inline: true },
-                { name: 'Версия', value: message.version || '—', inline: true },
-                { name: 'OS', value: message.os || '—', inline: true },
-                { name: 'VS Code', value: message.vscodeVersion || '—', inline: true },
-              ],
-              timestamp: new Date().toISOString()
-            };
-            if (message.logs) {
-              embed.fields.push({ name: 'Последние логи', value: '```\n' + message.logs.slice(0, 900) + '\n```' });
-            }
-            await undFetch(webhookUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ embeds: [embed] })
-            });
-            window.showInformationMessage('Отчёт отправлен. Спасибо!');
-            this.postMessage({ type: 'feedbackResult', success: true });
-          } catch (e: any) {
-            logger.error('Feedback send failed', e);
-            window.showErrorMessage('Не удалось отправить отчёт: ' + (e.message || ''));
-            this.postMessage({ type: 'feedbackResult', success: false });
-          }
+          // Open GitHub Issues page for bug reports
+          env.openExternal(Uri.parse('https://github.com/Ashibalt/Ashibalt-AI/issues'));
           break;
         }
         case "refreshOllamaModels": {
@@ -885,6 +893,20 @@ export class ChatViewProvider implements WebviewViewProvider {
         // still allow retry — just find the last user message.
         this.pruneLastAssistantMessage(true);
 
+        // SAFETY: Always prune _apiConversation trailing assistant/tool messages on retry,
+        // even if history didn't have an assistant at the end (can happen when error catch
+        // removes temporary assistant from history but onConversationUpdate already saved
+        // the full conversation with assistant messages).
+        while (this._apiConversation.length > 0) {
+          const last = this._apiConversation[this._apiConversation.length - 1];
+          if (last.role === 'assistant' || last.role === 'tool') {
+            this._apiConversation.pop();
+          } else {
+            break;
+          }
+        }
+        this.storageManager.saveApiConversation(this.currentSessionId, this._apiConversation).catch(() => {});
+
         const lastUserMessage = this.getLastUserMessage();
         if (!lastUserMessage) {
           window.showWarningMessage("Не удалось найти исходный запрос пользователя для повтора.");
@@ -952,10 +974,18 @@ export class ChatViewProvider implements WebviewViewProvider {
                 logger.error('Failed to create session for interrupted message', err);
               });
             } else {
-              // Empty/broken message — remove it entirely to prevent 400 errors
-              logger.log(`[stopStreaming] Removing empty temporary message ${msg.id} to prevent corrupted history`);
-              this.history.splice(i, 1);
-              this.postMessage({ type: 'removeMessage', id: msg.id });
+              // Empty/broken message — finalize it with a "stopped" notice
+              // so the user can still see the retry button
+              this.history[i].temporary = false;
+              this.history[i].content = '*(запрос прерван)*';
+              
+              this.postMessage({ 
+                type: 'streamEnd', 
+                id: msg.id,
+                content: '*(запрос прерван)*',
+                modelName: msg.modelName,
+                actions: msg.actions
+              });
             }
           }
         }
@@ -1111,16 +1141,13 @@ export class ChatViewProvider implements WebviewViewProvider {
     });
     this.context.subscriptions.push({ dispose: unsubscribeSnapshots });
     
-    // Send initial pending snapshots state
-    this.snapshots.sendUpdate();
+    // NOTE: Initial snapshot dashboard update is sent in the 'webviewReady' handler,
+    // NOT here — at this point the webview JS hasn't loaded yet, so messages are lost.
     
-    // Wait for history to be loaded, then restore chat
-    this.historyLoaded.then(() => {
-      this.postMessage({ type: "clearChat" });
-      for (const msg of this.history) {
-        this.postMessage({ type: "addMessage", role: msg.role, content: msg.content, id: msg.id, attachedFiles: msg.attachedFiles, actions: msg.actions, modelName: msg.modelName });
-      }
-    }).catch(e => logger.error('Failed to restore chat history', e));
+    // NOTE: Session restore is handled in the 'webviewReady' handler
+    // (which awaits historyLoaded before checking pendingRestoreSessionId).
+    // Do NOT send clearChat/addMessage here — messages sent before webviewReady
+    // are lost, and messages sent after could wipe a restored session.
   }
 
   private startSessionSync() {
@@ -1403,10 +1430,35 @@ export class ChatViewProvider implements WebviewViewProvider {
       if (lastNewUser) {
         // Check if already appended (avoid duplicates on retry)
         const lastConvUser = [...this._apiConversation].reverse().find(m => m.role === 'user');
+        const lastConvMsg = this._apiConversation[this._apiConversation.length - 1];
         if (!lastConvUser || lastConvUser.content !== lastNewUser.content) {
+          this._apiConversation.push({ role: 'user', content: lastNewUser.content });
+        } else if (lastConvMsg && lastConvMsg.role === 'assistant') {
+          // Conversation ends with assistant (e.g. after rate limit on Continue).
+          // API requires last message to be user or tool — append user message.
           this._apiConversation.push({ role: 'user', content: lastNewUser.content });
         }
       }
+
+      // SAFETY NET: Guarantee conversation never ends with assistant role.
+      // This catches ALL edge cases (partial saves on error, interrupted streams, etc.)
+      // that would cause 400 "Expected last role User or Tool but got assistant".
+      const finalMsg = this._apiConversation[this._apiConversation.length - 1];
+      if (finalMsg && finalMsg.role === 'assistant') {
+        const userContent = (lastNewUser?.content) || 'Продолжай выполнение задачи.';
+        this._apiConversation.push({ role: 'user', content: userContent });
+        logger.log('[API_CONV] Safety: conversation ended with assistant — appended user message');
+      }
+
+      // Remove empty assistant messages that would cause API errors
+      this._apiConversation = this._apiConversation.filter((msg: any) => {
+        if (msg.role === 'assistant' && !msg.content && (!msg.tool_calls || msg.tool_calls.length === 0)) {
+          logger.log('[API_CONV] Removed empty assistant message');
+          return false;
+        }
+        return true;
+      });
+
       providerMessages = this._apiConversation;
 
       // Normalize tool_call IDs for Mistral compatibility (requires [a-zA-Z0-9]{9})
@@ -2627,6 +2679,10 @@ export class ChatViewProvider implements WebviewViewProvider {
           // No saved mode — unlock mode toggle for new/legacy sessions
           this.postMessage({ type: 'lockMode', locked: false });
         }
+
+        // Always refresh snapshot dashboard after session load —
+        // pending changes are global (not per-session) but dashboard must be visible
+        this.snapshots.sendUpdate();
       } catch (e) {
         logger.error('Failed to load session from storage, falling back to in-memory', e);
         const session = this.sessions.find(s => s.id === sessionId);

@@ -1,7 +1,8 @@
-import { fetch } from 'undici';
+
 import * as vscode from 'vscode';
 import { logger } from '../logger';
 import { parseSSEStream, type ReadableStreamLike } from './sseParser';
+import { buildModelParams } from './modelParams';
 
 /** Structured API response from chat/completions */
 export interface ChatResponse {
@@ -56,34 +57,17 @@ export async function fetchOpenRouterWithTools(opts: {
     }
   }
 
-  const optimizedTemperature = isMistral ? 0.15 : 0.3;
-
-  // Resolve max_tokens with sane bounds
-  const configuredMaxTokensRaw = vscode.workspace.getConfiguration("ashibaltAi").get<number>("maxTokens", 16384);
-  const MIN_AGENT_MAX_TOKENS = 8192;
-  const configuredMaxTokens = Number.isFinite(configuredMaxTokensRaw)
-    ? Math.min(Math.max(Math.floor(configuredMaxTokensRaw as number), MIN_AGENT_MAX_TOKENS), 16384)
-    : 16384;
-  let maxTokens = configuredMaxTokens;
-  if (isDeepSeek && actualModel !== 'deepseek-reasoner') {
-    maxTokens = Math.min(maxTokens, 8192);
-  }
-  if (configuredMaxTokensRaw !== undefined && (configuredMaxTokensRaw as number) < MIN_AGENT_MAX_TOKENS) {
-    logger.log(`[FETCH] WARNING: maxTokens setting (${configuredMaxTokensRaw}) below minimum ${MIN_AGENT_MAX_TOKENS}, enforcing ${MIN_AGENT_MAX_TOKENS}`);
-  }
+  // Use centralized model parameters (temperature, top_p, max_tokens, n)
+  const params = buildModelParams(baseUrl, actualModel);
 
   const body: any = {
     model: actualModel,
     messages,
     stream: true,
-    temperature: optimizedTemperature,
-    top_p: 1,
-    n: 1,
-    max_tokens: maxTokens
+    ...params
   };
 
-  logger.log(`[FETCH] max_tokens=${maxTokens} for model: ${actualModel}`);
-  logger.log(`[FETCH] Request config: provider=${baseUrl}, messages=${messages.length}, tools=${tools?.length || 0}, toolChoice=${toolChoice || 'none'}`);
+  logger.log(`[FETCH] Request config: provider=${baseUrl}, messages=${messages.length}, tools=${tools?.length || 0}, toolChoice=${toolChoice || 'none'}, max_tokens=${params.max_tokens}`);
 
   if (tools && tools.length > 0) {
     body.tools = tools;
@@ -114,7 +98,7 @@ export async function fetchOpenRouterWithTools(opts: {
   };
   if (isOpenRouter) {
     headers['X-Title'] = 'Ashibalt AI';
-    headers['HTTP-Referer'] = 'https://github.com/Wosmos/ashibalt';
+    headers['HTTP-Referer'] = 'https://github.com/Ashibalt/Ashibalt-AI';
   }
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;

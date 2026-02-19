@@ -332,8 +332,8 @@ export async function runTerminalCommandTool(args: any, workspaceRoot?: string):
     }
     
     // Shell integration not available or failed - use child_process for output capture
-    // NOTE: Do NOT call agentTerminal.sendText() here — that would execute the command
-    // in the VS Code terminal AND in child_process, causing double execution.
+    // Show command in VS Code terminal for user visibility (child_process runs the actual execution)
+    activeTerminal.sendText(finalCommand);
     return await runCommandWithChildProcess(finalCommand, cwd, idleTimeoutMs);
     
   } catch (err: any) {
@@ -463,8 +463,7 @@ export async function runCommandWithChildProcess(command: string, cwd: string, i
 
 /**
  * Start a command in background mode (non-blocking).
- * Spawns the process, collects output in backgroundOutputBuffer,
- * waits briefly for initial output, then returns immediately.
+ * Runs the command in a VISIBLE VS Code terminal so the user can see it.
  */
 async function startBackgroundCommand(finalCommand: string, cwd: string, originalCommand: string): Promise<any> {
   const cp = await import('child_process');
@@ -478,55 +477,28 @@ async function startBackgroundCommand(finalCommand: string, cwd: string, origina
         backgroundProcess.kill('SIGKILL');
       }
     } catch { /* ignore */ }
+    backgroundProcess = null;
   }
 
   backgroundOutputBuffer = '';
   backgroundCommand = originalCommand;
-
-  const child = cp.spawn(finalCommand, {
-    cwd,
-    shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/bash',
-    windowsHide: true,
-    env: process.env
-  });
-
-  backgroundProcess = child;
   primaryTerminalBusy = true;
 
-  const push = (chunk: any) => {
-    const s = stripAnsi(String(chunk ?? ''));
-    if (!s) return;
-    backgroundOutputBuffer += s;
-    // Cap buffer at 50KB
-    if (backgroundOutputBuffer.length > 50000) {
-      backgroundOutputBuffer = backgroundOutputBuffer.slice(-30000);
-    }
-  };
-
-  child.stdout?.on('data', push);
-  child.stderr?.on('data', (d: any) => {
-    if (backgroundOutputBuffer && String(d ?? '').length) backgroundOutputBuffer += '\n';
-    push(d);
-  });
-
-  child.on('close', () => {
-    primaryTerminalBusy = false;
-    backgroundProcess = null;
-  });
-
-  child.on('error', (err: any) => {
-    backgroundOutputBuffer += `\n[ERROR] ${err?.message || String(err)}`;
-    primaryTerminalBusy = false;
-    backgroundProcess = null;
-  });
-
-  // Show in VS Code terminal for user visibility (read-only — actual execution is via child_process)
+  // Create/reuse a dedicated terminal for background commands
   if (!agentTerminal || agentTerminal.exitStatus !== undefined) {
     agentTerminal = vscode.window.createTerminal({ name: 'Ashibalt Agent', cwd });
   }
   agentTerminal.show(true);
-  // NOTE: Do NOT call sendText here — the command is already running via child_process.
-  // sendText would execute it a second time, causing double execution (e.g. two servers).
+  agentTerminal.sendText(finalCommand);
+
+  // Watch for terminal close to reset busy flag
+  const closeListener = vscode.window.onDidCloseTerminal(t => {
+    if (t === agentTerminal) {
+      primaryTerminalBusy = false;
+      backgroundProcess = null;
+      closeListener.dispose();
+    }
+  });
 
   // Wait briefly (3s) for initial output
   await new Promise(resolve => setTimeout(resolve, 3000));
@@ -536,9 +508,9 @@ async function startBackgroundCommand(finalCommand: string, cwd: string, origina
     command: originalCommand,
     cwd,
     background: true,
-    output: backgroundOutputBuffer.substring(0, 10000) || '(started, no output yet)',
-    message: 'Command started in background. Use read_terminal_output to check output later.',
-    method: 'child_process'
+    output: '(command started in VS Code terminal)',
+    message: 'Command started in the VS Code terminal "Ashibalt Agent". The output is visible there.',
+    method: 'vscode_terminal'
   };
 }
 

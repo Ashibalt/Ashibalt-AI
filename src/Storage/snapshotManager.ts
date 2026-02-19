@@ -83,6 +83,7 @@ export class SnapshotManager {
   private pendingDir: string;
   private snapshots: Map<string, FileSnapshot> = new Map(); // key = filePath
   private onChangeCallbacks: (() => void)[] = [];
+  private _initPromise: Promise<void> | null = null;
 
   constructor() {
     const homeDir = os.homedir();
@@ -94,9 +95,22 @@ export class SnapshotManager {
    * Initialize the manager - create directories and load existing snapshots
    */
   async init(): Promise<void> {
-    await this.ensureDir(this.snapshotsDir);
-    await this.ensureDir(this.pendingDir);
-    await this.loadPendingSnapshots();
+    this._initPromise = (async () => {
+      await this.ensureDir(this.snapshotsDir);
+      await this.ensureDir(this.pendingDir);
+      await this.loadPendingSnapshots();
+    })();
+    await this._initPromise;
+  }
+
+  /**
+   * Wait for initialization to complete. Safe to call multiple times.
+   * Returns immediately if already initialized or init() was never called.
+   */
+  async ready(): Promise<void> {
+    if (this._initPromise) {
+      await this._initPromise;
+    }
   }
 
   private async ensureDir(dir: string): Promise<void> {
@@ -189,6 +203,16 @@ export class SnapshotManager {
       snapshot.updatedAt = now;
       snapshot.totalLinesAdded += newLines.length;
       snapshot.totalLinesRemoved += oldLines.length;
+      
+      // If the original snapshot was from create_file (baselineContent === null)
+      // but this new change is an edit_file, the file now has real content
+      // that should be restored on rollback instead of deleting the file.
+      // We keep baselineContent = null only for create_file — this is correct:
+      // if the file was created by the model, rolling back should delete it.
+      // But the tool field should reflect the latest type for UI display.
+      if (tool !== 'create_file' && tool !== 'delete_file') {
+        snapshot.tool = tool;
+      }
     } else {
       // Create new snapshot with baseline
       // For baseline, we need the ORIGINAL file content before this change
@@ -425,8 +449,26 @@ export class SnapshotManager {
       const uri = vscode.Uri.file(snapshot.filePath);
 
       if (snapshot.baselineContent === null) {
-        // File was created - delete it
-        await vscode.workspace.fs.delete(uri);
+        // File was created by the model — verify it still looks like the
+        // created content before deleting.  If the file now contains content
+        // that clearly predates the model (e.g. it existed before and the
+        // snapshot was erroneously stored with null baseline), refuse to
+        // delete and instead just remove the snapshot.
+        try {
+          const currentBytes = await vscode.workspace.fs.readFile(uri);
+          const currentContent = Buffer.from(currentBytes).toString('utf8');
+          // Only delete if the file hasn't grown far beyond what the model produced
+          // (a safety net — if the user added significant content, don't wipe it)
+          const modelProducedLength = snapshot.changes.reduce((sum, c) => sum + c.newLines.join('\n').length, 0);
+          if (modelProducedLength > 0 && currentContent.length > modelProducedLength * 3 + 500) {
+            // File has grown beyond what the model wrote — don't delete, just drop snapshot
+            vscode.window.showWarningMessage(`Файл ${snapshot.fileName} значительно изменён с момента создания. Откат пропущен.`);
+          } else {
+            await vscode.workspace.fs.delete(uri);
+          }
+        } catch {
+          // File already gone — that's fine
+        }
       } else {
         // Restore baseline content
         const bytes = Buffer.from(snapshot.baselineContent, 'utf8');

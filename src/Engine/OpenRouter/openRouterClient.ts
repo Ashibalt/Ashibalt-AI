@@ -1,6 +1,7 @@
-import { fetch } from "undici";
+
 import { parseSSEStream, type ReadableStreamLike } from '../sseParser';
 import { logger } from '../../logger';
+import { buildModelParams } from '../modelParams';
 
 interface OpenRouterConfig {
   baseUrl?: string;
@@ -24,14 +25,6 @@ interface ChatOptions {
   reasoning?: { effort: string };
 }
 
-// Fixed parameters for all API calls
-const FIXED_PARAMS = {
-  temperature: 0.3,
-  top_p: 1,
-  max_tokens: 4096,
-  n: 1
-};
-
 export class OpenRouterClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -45,11 +38,13 @@ export class OpenRouterClient {
 
   async chat(options: ChatOptions, onChunk?: (chunk: string) => void, onReasoning?: (reasoning: string) => void): Promise<string> {
     const url = `${this.baseUrl}/chat/completions`;
+    const modelId = options.model ?? this.defaultModel ?? '';
+    const params = buildModelParams(this.baseUrl, modelId);
     const body: any = {
-      model: options.model ?? this.defaultModel,
+      model: modelId,
       messages: options.messages,
       stream: options.stream ?? true,
-      ...FIXED_PARAMS
+      ...params
     };
 
     // Add tools if provided
@@ -71,7 +66,7 @@ export class OpenRouterClient {
     // OpenRouter-specific headers for app identification
     if (this.baseUrl.includes('openrouter.ai')) {
       headers['X-Title'] = 'Ashibalt AI (beta)';
-      headers['HTTP-Referer'] = 'https://github.com/Ashibalt-AI';
+      headers['HTTP-Referer'] = 'https://github.com/Ashibalt/Ashibalt-AI';
     }
 
     if (authHeader) {

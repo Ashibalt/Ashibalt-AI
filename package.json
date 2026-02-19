@@ -1,7 +1,7 @@
 {
   "name": "ashibalt-ai",
   "displayName": "Ashibalt AI",
-  "description": "AI-агент для написания кода в VS Code. Agent-режим, мульти-провайдер (OpenRouter, Ollama, Mistral, DeepSeek), snapshot-система. | AI coding agent for VS Code. BETA.",
+  "description": "AI-агент для написания кода в VS Code. Agent-режим, мульти-провайдер (OpenRouter, Ollama, Mistral, DeepSeek)",
   "version": "0.1.0",
   "publisher": "Ashibalt",
   "license": "MIT",
@@ -41,7 +41,7 @@
   ],
   "main": "./out/extension.js",
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "cp node_modules/@vscode/codicons/dist/codicon.css media/codicon.css && cp node_modules/@vscode/codicons/dist/codicon.ttf media/codicon.ttf && npm run compile",
     "compile": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch",
     "test": "vitest run"
@@ -49,17 +49,13 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.106.1",
-    "@vscode/test-electron": "^2.5.0",
-    "typescript": "^5.5.0",
-    "vitest": "^4.0.12"
-  },
-  "dependencies": {
     "@vscode/codicons": "^0.0.43",
+    "@vscode/test-electron": "^2.5.0",
     "tree-sitter": "^0.21.1",
-    "tree-sitter-bash": "^0.25.0",
+    "tree-sitter-bash": "^0.21.0",
     "tree-sitter-c": "^0.21.0",
     "tree-sitter-cpp": "^0.22.0",
-    "tree-sitter-css": "^0.25.0",
+    "tree-sitter-css": "^0.21.0",
     "tree-sitter-go": "^0.21.0",
     "tree-sitter-html": "^0.23.2",
     "tree-sitter-java": "^0.21.0",
@@ -69,36 +65,21 @@
     "tree-sitter-ruby": "^0.21.0",
     "tree-sitter-rust": "^0.21.0",
     "tree-sitter-typescript": "^0.23.2",
-    "undici": "^7.0.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.0.12"
+  },
+  "dependencies": {
   },
   "contributes": {
     "configuration": {
       "title": "Ashibalt AI",
       "properties": {
-        "ashibaltAi.endpoint": {
-          "type": "string",
-          "default": "http://127.0.0.1:11434",
-          "description": "URL of the local Ollama inference server (e.g. http://127.0.0.1:11434)."
-        },
         "ashibaltAi.model": {
           "type": "string",
           "default": "",
-          "description": "Model name for Ollama inference. Models are fetched dynamically from the saved list."
+          "description": "Default model name. Managed via the Settings panel."
         },
-        "ashibaltAi.maxTokens": {
-          "type": "number",
-          "default": 8192,
-          "minimum": 8192,
-          "maximum": 16384,
-          "description": "Maximum number of tokens to generate per completion."
-        },
-        "ashibaltAi.temperature": {
-          "type": "number",
-          "default": 0.7,
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Sampling temperature for the model. Higher = more creative, lower = more precise."
-        },
+
         "ashibaltAi.agentIterations": {
           "type": "number",
           "default": 5,
@@ -161,13 +142,7 @@
           "default": "",
           "description": "Specific model for Autocomplete (overrides default)."
         },
-        "ashibaltAi.refactorMaxTokens": {
-          "type": "number",
-          "default": 1024,
-          "minimum": 256,
-          "maximum": 4096,
-          "description": "Maximum number of tokens for refactoring responses."
-        },
+
         "ashibaltAi.providerSettings": {
           "type": "object",
           "default": {},

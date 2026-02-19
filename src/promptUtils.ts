@@ -88,17 +88,37 @@ ${treeLines.join('\n')}
 export function getEnvironmentInfo(): string {
   const platform = os.platform();
   const osName = platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'macOS' : 'Linux';
-  const shell = process.env.SHELL || process.env.COMSPEC || 'unknown';
+  
+  // Detect the ACTUAL VS Code terminal shell, not the system default.
+  // Users on Windows often use bash/WSL in VS Code, so process.env.COMSPEC is misleading.
+  const platformKey = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'osx' : 'linux';
+  const terminalConfig = vscode.workspace.getConfiguration('terminal.integrated');
+  const profileName = terminalConfig.get<string>(`defaultProfile.${platformKey}`);
+  let shellName = 'unknown';
+  if (profileName) {
+    // Check if the profile name maps to a known shell
+    const profiles = terminalConfig.get<Record<string, any>>(`profiles.${platformKey}`, {});
+    const profile = profiles[profileName];
+    if (profile?.path) {
+      shellName = path.basename(String(profile.path)).replace(/\.exe$/i, '');
+    } else {
+      // Profile name itself is descriptive (e.g. "Git Bash", "PowerShell", "Command Prompt")
+      shellName = profileName;
+    }
+  } else {
+    // Fallback: system shell
+    const sysShell = process.env.SHELL || process.env.COMSPEC || '';
+    shellName = sysShell ? path.basename(sysShell).replace(/\.exe$/i, '') : 'unknown';
+  }
   
   return `<environment>
   <os>${osName}</os>
-  <shell>${path.basename(shell)}</shell>
+  <shell>${shellName}</shell>
 </environment>`;
 }
 
 /**
- * Get workspace info - folder structure with top-level directory listing
- * Includes first-level contents for workspace grounding (prevents wrong directory creation)
+ * Get workspace info - folder paths for the system prompt
  */
 export function getWorkspaceInfo(): string {
   const folders = vscode.workspace.workspaceFolders;
@@ -106,32 +126,10 @@ export function getWorkspaceInfo(): string {
     return '';
   }
   
-  const rootFolder = folders[0];
-  const rootPath = rootFolder.uri.fsPath;
   const folderPaths = folders.map(f => `    <folder>${f.uri.fsPath}</folder>`).join('\n');
   
-  // Include top-level directory listing for workspace grounding
-  let topLevel = '';
-  try {
-    const entries = fs.readdirSync(rootPath, { withFileTypes: true });
-    const visible = entries.filter(e => {
-      if (e.name.startsWith('.')) return false;
-      if (e.isDirectory() && IGNORED_DIRS.has(e.name)) return false;
-      return true;
-    });
-    visible.sort((a, b) => {
-      if (a.isDirectory() && !b.isDirectory()) return -1;
-      if (!a.isDirectory() && b.isDirectory()) return 1;
-      return a.name.localeCompare(b.name);
-    });
-    const items = visible.map(e => e.isDirectory() ? `${e.name}/` : e.name);
-    if (items.length > 0) {
-      topLevel = `\n    <top_level_contents>${items.join(', ')}</top_level_contents>`;
-    }
-  } catch { /* ignore */ }
-  
   return `<workspace>
-${folderPaths}${topLevel}
+${folderPaths}
 </workspace>`;
 }
 
@@ -207,7 +205,7 @@ ${wsInfo}
 <RULES>
 1. ALWAYS read_file BEFORE editing. edit_file will FAIL if you haven't read the file first in this session.
 2. ALWAYS prefer editing existing files. NEVER create new files unless explicitly required by the user.
-3. NEVER delete a file and recreate it. Use sequential edit_file calls instead.
+3. When you need to COMPLETELY REWRITE a file (>80% of content changes), use delete_file + create_file instead of a long chain of edit_file calls. But for partial changes — ALWAYS use edit_file.
 4. When read_file returns content, each line is prefixed "N: content". NEVER include the line number prefix in old_string or new_string — use only the actual content after the prefix.
 5. Keep edits focused: change only the lines that need changing, with 2-3 lines of surrounding context for unique matching.
 6. If edit_file fails with "old_string not found" — re-read the file, then retry with correct old_string. NEVER assume the file doesn't exist and create a new one.
@@ -227,6 +225,7 @@ ${wsInfo}
 20. When a terminal command is waiting for interactive input (e.g. \"y/n\", \"Do you want to continue?\"), use write_to_terminal(input=\"y\\n\") to respond. Read the full output first to understand what is being asked.
 21. NEVER create documentation files (API_DOCUMENTATION.md, ARCHITECTURE.md, CONTRIBUTING.md, DESIGN.md, etc.) unless the user EXPLICITLY asked for them. Focus only on the task at hand.
 22. After completing ALL user-requested changes, run a build verification command in terminal (e.g. "npx tsc --noEmit 2>&1" for TypeScript projects) to catch any type errors diagnose() might miss. Fix all errors before declaring done.
+23. Use the correct terminal syntax for the shell specified in <shell>. For bash: use &&, $(), forward slashes. For cmd: use &, %VAR%, backslashes. For PowerShell: use ;, $VAR, -Command.
 </RULES>
 
 <WORKFLOW>

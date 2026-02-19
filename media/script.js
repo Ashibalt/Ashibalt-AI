@@ -461,7 +461,7 @@
       if (mistralLink) {
         mistralLink.addEventListener('click', (e) => {
           e.preventDefault();
-          vscode.postMessage({ type: 'openExternal', url: 'https://telegra.ph/Besplatno-1mlrd-tokenov-v-mesyac-02-10' });
+          vscode.postMessage({ type: 'openExternal', url: 'https://telegra.ph/Besplatno-1mlrd-tokenov-v-mesyac-02-17' });
         });
       }
 
@@ -583,9 +583,9 @@
         });
         messageInput.value = '';
         messageInput.style.height = 'auto';
-        // Track user request for usage metrics
+        // Track user request for usage metrics (only requests count; model tracked via metricsUpdate)
         if (metricsToggle && metricsToggle.checked) {
-          trackUsageEvent({ requests: 1, model: selectedModel.id || '' });
+          trackUsageEvent({ requests: 1 });
         }
         // Change button to Stop only if not an immediate command
         if (sendBtn && !isImmediateCommand(text)) {
@@ -1261,76 +1261,9 @@
     // ===== Report / Feedback Button =====
     const reportBtn = document.getElementById('report-btn');
     if (reportBtn) {
-      reportBtn.addEventListener('click', showFeedbackDialog);
-    }
-
-    function showFeedbackDialog() {
-      const existing = document.getElementById('feedback-overlay');
-      if (existing) existing.remove();
-
-      const overlay = document.createElement('div');
-      overlay.id = 'feedback-overlay';
-      overlay.className = 'model-browser-overlay'; // reuse overlay style
-
-      const selectedModel = savedModels?.find(m => m.id === currentSelectedModelId);
-
-      overlay.innerHTML = `
-        <div class="feedback-dialog">
-          <div class="feedback-header">
-            <span class="feedback-title">Сообщить о проблеме</span>
-            <button class="model-browser-close feedback-close">&times;</button>
-          </div>
-          <div class="feedback-body">
-            <textarea class="feedback-textarea" placeholder="Опишите проблему..." rows="5"></textarea>
-            <div class="feedback-meta">
-              <span>Провайдер: <b>${selectedModel?.provider || '—'}</b></span>
-              <span>Модель: <b>${selectedModel?.id || '—'}</b></span>
-            </div>
-            <label class="feedback-checkbox-row">
-              <input type="checkbox" class="feedback-logs-check" checked>
-              <span>Приложить последние логи</span>
-            </label>
-          </div>
-          <div class="feedback-footer">
-            <button class="btn btn-secondary feedback-cancel">Отмена</button>
-            <button class="btn btn-primary feedback-send">
-              <span class="codicon codicon-send"></span> Отправить
-            </button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-
-      const closeDialog = () => overlay.remove();
-      overlay.querySelector('.feedback-close').addEventListener('click', closeDialog);
-      overlay.querySelector('.feedback-cancel').addEventListener('click', closeDialog);
-      overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
-
-      overlay.querySelector('.feedback-send').addEventListener('click', () => {
-        const desc = overlay.querySelector('.feedback-textarea').value.trim();
-        if (!desc) {
-          overlay.querySelector('.feedback-textarea').style.borderColor = '#f44336';
-          return;
-        }
-        const includeLogs = overlay.querySelector('.feedback-logs-check').checked;
-
-        vscode.postMessage({
-          type: 'sendFeedback',
-          description: desc,
-          provider: selectedModel?.provider || '',
-          model: selectedModel?.id || '',
-          version: '0.1.0',
-          os: navigator.platform || '',
-          vscodeVersion: typeof acquireVsCodeApi !== 'undefined' ? 'web' : '',
-          logs: includeLogs ? (window.__lastLogs || '') : ''
-        });
-        closeDialog();
+      reportBtn.addEventListener('click', () => {
+        vscode.postMessage({ type: 'sendFeedback' });
       });
-
-      // Escape
-      const esc = (e) => { if (e.key === 'Escape') { closeDialog(); document.removeEventListener('keydown', esc); } };
-      document.addEventListener('keydown', esc);
-      setTimeout(() => overlay.querySelector('.feedback-textarea')?.focus(), 50);
     }
 
     if (closeSettingsBtn) {
@@ -1630,7 +1563,7 @@
           break;
         case 'metricsUpdate':
           updateMetricsDashboard(message.metrics);
-          // Track cumulative token deltas (input/output separate) + iterations
+          // Track cumulative token deltas (input/output separate)
           if (metricsToggle && metricsToggle.checked && message.metrics) {
             const inNow = message.metrics.inputTokens || 0;
             const outNow = message.metrics.outputTokens || 0;
@@ -1639,9 +1572,17 @@
             const eventData = {};
             if (inDelta > 0) eventData.inputTokens = inDelta;
             if (outDelta > 0) eventData.outputTokens = outDelta;
+            // Track model usage from agentLoop (authoritative source)
+            if (message.metrics.model) eventData.model = message.metrics.model;
             trackUsageEvent(eventData);
             window.__lastInputTokens = inNow;
             window.__lastOutputTokens = outNow;
+          }
+          break;
+        case 'toolUsed':
+          // Centralized tool usage tracking — agentLoop sends this for EVERY tool call
+          if (metricsToggle && metricsToggle.checked && message.tool) {
+            trackUsageEvent({ tool: message.tool });
           }
           break;
         case 'streamEnd':
@@ -1653,11 +1594,19 @@
               if (message.actions && message.actions.length > 0) {
                 msg.dataset.actions = JSON.stringify(message.actions);
               }
-              if (msg.dataset.needsFooter) {
-                const content = msg.dataset.raw || '';
-                const modelName = msg.dataset.modelName || '';
-                appendFooterToMessage(msg, content, modelName);
+              // If raw content is empty but backend sent content, populate it
+              if (!msg.dataset.raw && message.content) {
+                msg.dataset.raw = message.content;
+                // Also render it visibly if msgDiv is empty
+                const msgDiv = msg.querySelector('.markdown-content') || msg;
+                if (!msgDiv.textContent?.trim()) {
+                  msgDiv.innerHTML = renderMarkdown(message.content);
+                }
               }
+              // Always attempt to add footer (appendFooterToMessage is idempotent)
+              const content = msg.dataset.raw || message.content || '';
+              const modelName = msg.dataset.modelName || message.modelName || '';
+              appendFooterToMessage(msg, content, modelName);
             }
           }
           // Clean up any stuck "correcting" indicators — replace spinner with error state
@@ -1981,10 +1930,8 @@
               ...message.fileAction,
               replyTo: message.id
             });
-            if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'read_file' });
           } else {
             showFileReadAction(message);
-            if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'read_file' });
           }
           break;
         case 'fileEditAction':
@@ -1993,7 +1940,6 @@
               ...message.fileAction,
               replyTo: message.id
             });
-            if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'edit_file' });
           }
           break;
         case 'fileCreateAction':
@@ -2002,7 +1948,6 @@
               ...message.fileAction,
               replyTo: message.id
             });
-            if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'create_file' });
           }
           break;
         case 'fileDeleteAction':
@@ -2011,7 +1956,6 @@
               ...message.fileAction,
               replyTo: message.id
             });
-            if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'delete_file' });
           }
           break;
         case 'webSearchStart':
@@ -2019,11 +1963,9 @@
           break;
         case 'webSearchResult':
           showWebSearchResult(message.id, message.success, message.query, message.results, message.resultsCount);
-          if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'web_search' });
           break;
         case 'searchResult':
           showCodeSearchResult(message.id, message.success, message.query, message.mode, message.results, message.totalResults);
-          if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'search' });
           break;
         case 'terminalConfirm':
           showTerminalConfirmation(message.command, message.workingDir, message.id);
@@ -2039,7 +1981,6 @@
           break;
         case 'terminalResult':
           showTerminalResult(message.id, message.command, message.output, message.exitCode, message.success, message.rejected, message.error);
-          if (metricsToggle && metricsToggle.checked) trackUsageEvent({ tool: 'terminal' });
           break;
         case 'requireModelSelection':
           flashModelSelectorWarning();

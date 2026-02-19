@@ -12,6 +12,13 @@ import { fetchOpenRouterWithTools, type ChatResponse } from './fetchWithTools';
 export { parseApiError } from './agentErrors';
 
 /**
+ * Module-level rate limiter: persists across agent loop calls.
+ * Prevents rapid-fire API requests that trigger provider rate limits (429).
+ */
+const MIN_API_INTERVAL_MS = 2000; // 2 seconds minimum between API calls
+let lastApiCallTime = 0;
+
+/**
  * Default context window for models where API didn't return context_length.
  * 32K is safe for virtually all modern models.
  */
@@ -173,11 +180,9 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
   // Updated ONLY from API prompt_tokens (most accurate).
   // Used for all UI metrics to prevent saw-tooth display pattern.
   let lastKnownContextTokens = 0;
-
-  const isMistralApi = baseUrl.includes('mistral.ai');
-  if (isMistralApi) {
-    logger.log(`[AGENT] Mistral API detected - using optimized parameters (temp=0.15)`);
-  }
+  // How many messages were in conversationMessages when lastKnownContextTokens was set.
+  // Used to estimate tokens for messages added AFTER the last API call.
+  let messagesAtLastApiCall = 0;
 
   // Set FileTime session so read_file/edit_file can track per-session reads
   const fileTime = getFileTime();
@@ -203,10 +208,11 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
   let consecutiveWebSearchCount = 0;
   const MAX_CONSECUTIVE_WEB_SEARCH = 3;
 
-  // Rate limiter: enforce minimum 1.5s between API calls (prevents 429 on fast providers like Mistral)
-  const MIN_API_INTERVAL_MS = 1500;
-  let lastApiCallTime = 0;
+  // 429 retry backoff state (resets each loop call)
+  let consecutiveRateLimitRetries = 0;
+  const MAX_RATE_LIMIT_RETRIES = 3;
 
+  try {
   while (iteration < maxIterations) {
     logger.log(`[AGENT] Iteration ${iteration + 1}/${maxIterations}`);
     
@@ -228,7 +234,7 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       return true;
     });
 
-    // Rate limit: wait if less than MIN_API_INTERVAL_MS since last call
+    // Rate limit: wait if less than MIN_API_INTERVAL_MS since last call (module-level, persists across calls)
     const now = Date.now();
     const elapsed = now - lastApiCallTime;
     if (lastApiCallTime > 0 && elapsed < MIN_API_INTERVAL_MS) {
@@ -238,7 +244,10 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
     }
     lastApiCallTime = Date.now();
 
-    // Make API request (no rate limit retry - let errors propagate to user)
+    // Record message count before API call for accurate context size tracking
+    messagesAtLastApiCall = conversationMessages.length;
+
+    // Make API request with automatic 429 retry (exponential backoff)
     let response: ChatResponse;
     try {
       response = await fetchOpenRouterWithTools({
@@ -265,8 +274,25 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
           postMessage({ type: 'streamResponse', content: accumulatedContent, reasoning: accumulatedReasoning, id: assistantPlaceholderId, tokenCount: estTokens, modelName: effectiveModel });
         }
       });
+      // Successful request — reset retry counter
+      consecutiveRateLimitRetries = 0;
     } catch (apiError: any) {
       const { summary, details } = parseApiError(apiError);
+      const rawMsg = apiError?.message || String(apiError);
+
+      // Auto-retry on 429 rate limit errors with exponential backoff
+      // Check both parsed summary (Russian) and raw error message (contains HTTP status)
+      const is429 = rawMsg.includes('(429)') || summary.includes('429') || summary.includes('лимит запросов') || summary.toLowerCase().includes('rate limit') || summary.toLowerCase().includes('too many requests');
+      if (is429 && consecutiveRateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
+        consecutiveRateLimitRetries++;
+        const backoffMs = Math.min(2000 * Math.pow(2, consecutiveRateLimitRetries), 30000); // 4s, 8s, 16s
+        logger.log(`[AGENT] 429 rate limit hit — auto-retry ${consecutiveRateLimitRetries}/${MAX_RATE_LIMIT_RETRIES} after ${backoffMs}ms`);
+        postMessage({ type: 'streamResponse', content: accumulatedContent + `\n\n⏳ *Rate limit — автоматический повтор через ${Math.round(backoffMs / 1000)}с...*`, id: assistantPlaceholderId, tokenCount: 0, modelName: effectiveModel });
+        lastApiCallTime = Date.now() + backoffMs; // Prevent next iteration from firing too soon
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        continue; // Retry the same iteration
+      }
+
       const wrapped = new Error(summary) as any;
       wrapped.errorDetails = details;
       throw wrapped;
@@ -294,7 +320,8 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       apiCalls: sessionApiCalls,
       currentContextTokens: estInputTokens,
       contextLimit: modelContextLength || DEFAULT_CONTEXT_WINDOW,
-      cachedTokens: currentModelHasCache ? sessionCachedTokens : 0
+      cachedTokens: currentModelHasCache ? sessionCachedTokens : 0,
+      model: model  // for webview model usage tracking
     };
     postMessage({
       type: 'metricsUpdate',
@@ -643,6 +670,9 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
         }
       }
       const toolDuration = Date.now() - toolStart;
+
+      // Notify webview about tool usage for metrics tracking (all tools, one place)
+      postMessage({ type: 'toolUsed', tool: toolName });
 
       // Log tool result summary
       if (result?.error) {
@@ -998,8 +1028,10 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       // The mid-loop compression below is the only safety net — it only fires
       // when context exceeds 80% of the window, which rarely happens.
 
-      const contextSize = estimateTokenCount(conversationMessages);
-      logger.log(`[CACHE] Context size check: ${contextSize} tokens (threshold=${MID_LOOP_COMPRESS_THRESHOLD})`);
+      const contextSize = lastKnownContextTokens > 0 && messagesAtLastApiCall > 0
+        ? lastKnownContextTokens + estimateTokenCount(conversationMessages.slice(messagesAtLastApiCall))
+        : estimateTokenCount(conversationMessages);
+      logger.log(`[CACHE] Context size check: ${contextSize} tokens (threshold=${MID_LOOP_COMPRESS_THRESHOLD})${lastKnownContextTokens > 0 ? ` [base=${lastKnownContextTokens} from API + ${contextSize - lastKnownContextTokens} delta]` : ' [estimate]'}`);
       if (contextSize > MID_LOOP_COMPRESS_THRESHOLD) {
         const dropTarget = Math.floor(MID_LOOP_COMPRESS_THRESHOLD * DROP_TARGET_RATIO);
         const tokensToSave = contextSize - dropTarget;
@@ -1163,6 +1195,14 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
         break;
       }
     }
+  }
+  } catch (loopError) {
+    // CRITICAL: Persist conversation state before propagating error.
+    // Without this, all tool results and assistant messages from this agent loop run are LOST,
+    // causing context loss when user retries after a provider error.
+    logger.log(`[AGENT] Error in agent loop — saving conversation state (${conversationMessages.length} messages) before propagating`);
+    onConversationUpdate?.(conversationMessages);
+    throw loopError;
   }
 
   // Build full content from all text actions for storage

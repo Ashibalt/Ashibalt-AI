@@ -91,6 +91,7 @@ src/
 │   ├── agentLoop.ts          # Main agent loop (tool calling)
 │   ├── agentErrors.ts        # API error parsing, JSON recovery
 │   ├── fetchWithTools.ts     # HTTP requests to chat/completions
+│   ├── modelParams.ts        # Centralized model parameters (temp, top_p, max_tokens)
 │   ├── toolCalling.ts        # Tool registry and dispatcher
 │   ├── diagnosticsEngine.ts  # Tree-sitter syntax analysis
 │   ├── sseParser.ts          # SSE stream parser
