@@ -12,7 +12,7 @@
 
 - **Agent Mode** — autonomous code editing, file creation, terminal commands, iterative problem solving via agent loop
 - **Chat Mode** — read-only AI assistant with your codebase context
-- **8 Providers** — Ollama (local, free), OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Gemini
+- **4 Providers** — Ollama (local, free), OpenRouter, Mistral, DeepSeek.
 - **Model Browser** — search and add models directly from the UI
 - **Snapshot System** — every file edit creates a recoverable snapshot with inline Accept / Reject buttons
 - **12 Tools** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`, `web_search`
