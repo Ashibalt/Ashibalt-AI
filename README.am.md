@@ -12,7 +12,7 @@
 
 - **Գործակալի ռեժիմ** — կոդի ինքնավար խմբագրում, ֆայլերի ստեղծում, տերմինալային հրամաններ, կրկնողական խնդիրների լուծում
 - **Չաթի ռեժիմ** — կարդալ-միայն AI օգնական՝ ձեր կոդային բազայի համատեքստով
-- **8 մատակարար** — Ollama (տեղական, անվճար), OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Gemini
+- **4 մատակարար** — Ollama (տեղական, անվճար), OpenRouter, Mistral, DeepSeek.
 - **Մոդելների դիտարկիչ** — մոդելների որոնում և ավելացում անմիջապես UI-ից
 - **Snapshot համակարգ** — ֆայլի յուրաքանչյուր խմբագրում ստեղծում է վերականգնելի snapshot՝ ներկառուցված Accept / Reject կոճակներով
 - **12 գործիք** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`, `web_search`
