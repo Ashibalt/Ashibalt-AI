@@ -12,7 +12,7 @@
 
 - **Agent-режим** — автономное редактирование кода, создание файлов, запуск терминальных команд, итеративное решение задач через цикл агента
 - **Chat-режим** — AI-ассистент только для чтения с доступом к контексту вашего проекта
-- **8 провайдеров** — Ollama (локально, бесплатно), OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Gemini
+- **4 провайдеров** — Ollama (локально, бесплатно), OpenRouter, Mistral, DeepSeek.
 - **Браузер моделей** — поиск и добавление моделей прямо из интерфейса
 - **Snapshot-система** — каждая правка файла создаёт снимок с кнопками Accept / Reject в редакторе
 - **12 инструментов** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`, `web_search`
