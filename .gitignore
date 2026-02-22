@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+
+# Package artifacts
+*.vsix
+
+# Environment / secrets
+.env
+.env.*
+
+# Logs
+logs.txt
+logs-session/
+
+# VS Code test workspace
+.vscode-test/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dev-only / personal files
+ы.txt
+playground/
+
+# Separate projects in workspace (not part of extension)
+opencode/
+Other/
+OpenAgent-main/
+
+# Generated assets (copied from node_modules at build time)
+media/codicon.css
+media/codicon.ttf
+

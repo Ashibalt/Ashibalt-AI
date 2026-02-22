@@ -1,0 +1,48 @@
+# Build/config
+.vscode/**
+.vscode-test/**
+node_modules/**
+tsconfig.json
+vitest.config.ts
+.env
+*.vsix
+
+# Source (compiled JS goes in out/)
+src/**
+test/**
+playground/**
+ashibalt-server/**
+
+# Large/dev-only folders
+opencode/**
+Other/**
+OpenAgent-main/**
+logs-session/**
+research/**
+
+# Compiled artifacts not needed at runtime
+out/**/*.d.ts
+out/**/*.js.map
+
+# Misc
+Исследование.md
+Задачи.md
+RoadMap.md
+BUILD.md
+logs.txt
+ы.txt
+CHANGELOG.md
+.gitignore
+.git/**
+__pycache__/**
+ashlight-metrics-server/**
+package-lock.json
+
+# Extra READMEs (main README.md is kept)
+README.hy.md
+README.am.md
+README.en.md
+README.ru.md
+
+# Stray files in icon_providers
+icon_providers/response.html
