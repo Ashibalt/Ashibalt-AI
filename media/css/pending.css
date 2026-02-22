@@ -4,20 +4,22 @@
 
     /* Pending Changes Dashboard */
     .pending-changes-dashboard {
-      margin: 0 11px 0;
-      border-radius: 14px 14px 0 0;
+      margin: 0;
+      border-radius: 0;
       font-size: 11px;
-      background: var(--input-bg, #1a1a1c);
+      background: rgba(255,255,255,0.015);
       border: none;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
+      border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.07));
       overflow: hidden;
+      flex-shrink: 0;
     }
 
     .dashboard-header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
+      gap: 5px;
+      height: 26px;
+      padding: 0 8px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.03);
       background: transparent;
     }
@@ -87,37 +89,36 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 3px 8px;
-      border: 1px solid transparent;
-      border-radius: 6px;
+      height: 18px;
+      padding: 0 8px;
+      border: none;
+      border-radius: 3px;
       cursor: pointer;
-      font-size: 10px;
+      font-size: 10.5px;
       font-family: inherit;
-      font-weight: 400;
-      transition: all 0.15s;
+      font-weight: 500;
+      transition: opacity 0.15s;
     }
 
     .dashboard-btn-confirm {
-      background: rgba(91, 124, 246, 0.08);
-      color: var(--accent-color, #5b7cf6);
-      border-color: rgba(91, 124, 246, 0.15);
+      background: var(--accent-color, #5b7cf6);
+      color: #fff;
     }
 
     .dashboard-btn-confirm:hover {
-      background: rgba(91, 124, 246, 0.14);
-      border-color: rgba(91, 124, 246, 0.25);
+      opacity: 0.85;
     }
 
     .dashboard-btn-revert {
-      background: transparent;
+      background: rgba(255,255,255,0.06);
       color: var(--secondary-text);
-      border-color: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      margin-left: 2px;
     }
 
     .dashboard-btn-revert:hover {
       color: #f87171;
-      border-color: rgba(248, 113, 113, 0.25);
-      background: rgba(248, 113, 113, 0.06);
+      border-color: rgba(248, 113, 113, 0.3);
     }
 
     .dashboard-body {

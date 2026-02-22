@@ -115,34 +115,35 @@
   <!-- Tool indicators (shows active tool calls like "Чтение src/file.ts") -->
   <div class="tool-indicators" id="tool-indicators" aria-live="polite"></div>
 
-  <!-- Pending Changes Dashboard -->
-  <div class="pending-changes-dashboard" id="pending-changes-dashboard" style="display: none;">
-    <div class="dashboard-header">
-      <button class="dashboard-toggle" id="dashboard-toggle" title="Свернуть/Развернуть">
-          <span class="codicon codicon-chevron-down"></span>
-        </button>
-      <div class="dashboard-title">
-        <span>Ожидающие изменения</span>
-        <span class="dashboard-count" id="dashboard-count">0</span>
-        <span class="dashboard-total-stats" id="dashboard-total-stats"></span>
-      </div>
-      <div class="dashboard-actions">
-        <button class="dashboard-btn dashboard-btn-confirm" id="confirm-all-btn" title="Подтвердить все">
-          <span>Сохранить</span>
-        </button>
-        <button class="dashboard-btn dashboard-btn-revert" id="revert-all-btn" title="Откатить все">
-          <span>Откатить</span>
-        </button>
-      </div>
-    </div>
-    <div class="dashboard-body" id="dashboard-body">
-      <div class="dashboard-files" id="dashboard-files">
-        <!-- File items will be injected here -->
-      </div>
-    </div>
-  </div>
-
   <div class="input-container">
+
+    <!-- Pending Changes Dashboard (inside input-container for unified panel styling) -->
+    <div class="pending-changes-dashboard" id="pending-changes-dashboard" style="display: none;">
+      <div class="dashboard-header">
+        <button class="dashboard-toggle" id="dashboard-toggle" title="Свернуть/Развернуть">
+            <span class="codicon codicon-chevron-down"></span>
+          </button>
+        <div class="dashboard-title">
+          <span>Ожидающие изменения</span>
+          <span class="dashboard-count" id="dashboard-count">0</span>
+          <span class="dashboard-total-stats" id="dashboard-total-stats"></span>
+        </div>
+        <div class="dashboard-actions">
+          <button class="dashboard-btn dashboard-btn-confirm" id="confirm-all-btn" title="Подтвердить все">
+            <span>Сохранить</span>
+          </button>
+          <button class="dashboard-btn dashboard-btn-revert" id="revert-all-btn" title="Откатить все">
+            <span>Откатить</span>
+          </button>
+        </div>
+      </div>
+      <div class="dashboard-body" id="dashboard-body">
+        <div class="dashboard-files" id="dashboard-files">
+          <!-- File items will be injected here -->
+        </div>
+      </div>
+    </div>
+
     <!-- Model Dropdown -->
     <div class="model-dropdown" id="model-dropdown">
       <!-- Models injected here -->

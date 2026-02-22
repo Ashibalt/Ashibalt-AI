@@ -3,44 +3,44 @@
               список моделей, кнопки, формы
    ================================================================ */
 
-    /* ── Settings Modal (centered, Variant C) ── */
+    /* ── Settings Drawer (slides up from bottom) ── */
     .settings-panel {
       position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0.96);
-      width: min(600px, 92vw);
-      max-height: min(540px, 85vh);
-      background: var(--input-bg, #1a1a1c);
-      border: 1px solid var(--border-color, rgba(255,255,255,0.07));
-      border-radius: var(--radius-outer, 18px);
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      max-height: 74vh;
+      transform: translateY(100%);
+      background: #1a1a1c;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-bottom: none;
+      border-radius: 14px 14px 0 0;
       z-index: 200;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03);
+      box-shadow: 0 -12px 48px rgba(0,0,0,0.45);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.22s var(--ease, cubic-bezier(.16,1,.3,1)),
-                  transform 0.22s var(--ease, cubic-bezier(.16,1,.3,1));
+      transition: transform 0.3s cubic-bezier(.16,1,.3,1),
+                  opacity 0.2s cubic-bezier(.16,1,.3,1);
       overflow: hidden;
     }
 
     .settings-panel.visible {
+      transform: translateY(0);
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
       pointer-events: auto;
     }
 
     .settings-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.50);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.45);
       z-index: 199;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.22s var(--ease, cubic-bezier(.16,1,.3,1));
+      transition: opacity 0.22s;
     }
 
     .settings-overlay.visible {
@@ -49,37 +49,41 @@
     }
 
     .settings-header {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 10;
-      padding: 0;
-      border: none;
-      background: transparent;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
     }
 
     .settings-header h3 {
-      display: none;
+      margin: 0;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #52525c;
     }
 
     .close-settings-btn {
-      background: rgba(255,255,255,0.05);
+      background: none;
       border: none;
-      color: var(--secondary-text);
+      color: #52525c;
       cursor: pointer;
       padding: 0;
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 8px;
+      border-radius: 6px;
       transition: background 0.15s, color 0.15s;
     }
 
     .close-settings-btn:hover {
-      background: rgba(255,255,255,0.1);
-      color: var(--text-color);
+      background: rgba(255,255,255,0.07);
+      color: #e8e8ea;
     }
 
     .settings-content {
@@ -89,26 +93,21 @@
       min-height: 0;
     }
 
-    /* ── Split-panel nav (Variant C) ── */
+    /* ── Split-panel nav ── */
     .sp-nav {
-      width: 160px;
+      width: 150px;
       flex-shrink: 0;
-      background: rgba(255, 255, 255, 0.02);
-      border-right: 1px solid rgba(255,255,255,0.05);
-      padding: 14px 8px;
+      background: transparent;
+      border-right: 1px solid rgba(255,255,255,0.04);
+      padding: 10px 8px;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
       overflow-y: auto;
     }
 
     .sp-nav-title {
-      font-size: 10px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--secondary-text);
-      font-weight: 500;
-      padding: 6px 10px 10px;
+      display: none;
     }
 
     .sp-nav-item {
@@ -135,7 +134,7 @@
     }
 
     .sp-nav-item.active {
-      color: var(--text-color);
+      color: #e8e8ea;
       background: rgba(255,255,255,0.06);
     }
 
@@ -161,7 +160,7 @@
     .sp-main {
       flex: 1;
       overflow-y: auto;
-      padding: 18px 20px;
+      padding: 16px 20px;
     }
 
     /* ── Variant C main area helpers ── */
@@ -169,12 +168,16 @@
       font-size: 16px;
       font-weight: 500;
       margin-bottom: 4px;
+      justify-content: center;
+      display: flex;
     }
 
     .sp-main-desc {
       font-size: 12px;
       color: var(--secondary-text);
       margin-bottom: 20px;
+      justify-content: center;
+      display: flex;
     }
 
     .sp-field {
@@ -310,7 +313,7 @@
 
     /* ── Settings Sections ── */
     .settings-section {
-      padding: 16px;
+      padding: 10px;
       border-bottom: 1px solid var(--border-color);
     }
 

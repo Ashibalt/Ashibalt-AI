@@ -66,81 +66,68 @@
       text-align: left;
     }
 
-    /* Metrics Dashboard — sticky at bottom of chat */
+    /* Metrics Dashboard — compact 20px strip with pipe separators */
     .metrics-dashboard {
       display: none;
       align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 4px 14px 5px;
-      font-size: 10px;
-      color: var(--text-3, #52525c);
-      background: var(--input-bg, #1a1a1c);
-      border: none;
-      border-radius: 14px 14px 0 0;
+      height: 20px;
+      padding: 0;
+      font-size: 9.5px;
+      color: var(--secondary-text, #8a8a96);
+      background: transparent;
+      border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.07));
+      gap: 0;
+      flex-shrink: 0;
     }
 
     .metrics-item {
       display: inline-flex;
       align-items: center;
       gap: 3px;
+      padding: 0 7px;
+      height: 100%;
+      border-right: 1px solid var(--border-color, rgba(255,255,255,0.07));
       white-space: nowrap;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 9.5px;
+      color: var(--secondary-text, #858585);
+    }
+
+    .metrics-item:last-child {
+      border-right: none;
     }
 
     .metrics-item .codicon {
-      font-size: 12px;
-      opacity: 0.7;
+      font-size: 11px;
+      opacity: 0.55;
     }
 
     .metrics-separator {
-      width: 1px;
-      height: 12px;
-      background: var(--border-color);
-      opacity: 0.6;
+      display: none;
     }
 
     .metrics-cache {
-      color: var(--accent-color, #4ec9b0);
-      opacity: 0.85;
+      color: var(--accent-color, #5b7cf6);
     }
 
     .metrics-no-cache {
-      opacity: 0.45;
+      opacity: 0.3;
     }
 
-    /* When pending-changes dashboard is above, connect to chat-card */
+    /* When pending-changes dashboard is above metrics inside input-container */
     .has-pending .chat-card,
-    /* When metrics strip is visible above chat-card, connect them seamlessly */
     .has-metrics .chat-card {
-      border-radius: 0 0 14px 14px;
+      border-radius: 0;
     }
 
     .has-pending.has-metrics .chat-card {
-      border-radius: 0 0 14px 14px;
+      border-radius: 0;
     }
 
-    /* Cancel flex gap so connected components touch */
     .has-metrics .metrics-dashboard {
-      margin-bottom: -6px;
+      margin-bottom: 0;
     }
 
-    /* Ultra-subtle separator between metrics and chat-card */
-    .has-metrics .metrics-dashboard::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 14px;
-      right: 14px;
-      height: 1px;
-      background: rgba(255,255,255,0.03);
-    }
-
-    .metrics-dashboard {
-      position: relative;
-    }
-
-    /* When pending dashboard is above metrics, flatten metrics radius */
     .has-pending .metrics-dashboard {
       border-radius: 0;
     }
@@ -282,19 +269,23 @@
 
     /* Input Area */
     .input-container {
-      padding: 0px 11px 12px;
-      background: var(--bg-color);
+      padding: 0 0 0 0;
+      margin: 0;
+      background: var(--input-bg, #1a1a1c);
+      border: 1px solid var(--border-color, rgba(255,255,255,0.07));
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 0;
     }
 
     /* Context Chips */
     .context-bar {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
       min-height: 0;
+      padding: 4px 10px 2px;
     }
 
     .context-chip {
@@ -325,20 +316,16 @@
 
     /* ── Main Input Card ─── */
     .chat-card {
-      background: var(--input-bg, #1a1a1c);
+      background: transparent;
       border: none;
-      border-radius: 14px;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
-      transition: box-shadow 0.25s var(--ease, cubic-bezier(.16,1,.3,1));
+      border-radius: 0;
+      box-shadow: none;
       position: relative;
       overflow: visible;
     }
 
     .chat-card:focus-within {
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.07),
-        0 2px 16px rgba(0,0,0,0.12),
-        0 0 20px rgba(91,124,246,0.04);
+      box-shadow: none;
     }
 
     /* ── textarea ─── */
@@ -349,13 +336,13 @@
       outline: none;
       resize: none;
       font-family: inherit;
-      font-size: 13px;
-      font-weight: 400;
+      font-size: 12.5px;
+      font-weight: 300;
       color: var(--text-color);
-      line-height: 1.65;
-      padding: 12px 14px 4px;
-      min-height: 42px;
-      max-height: 200px;
+      line-height: 1.55;
+      padding: 9px 10px 7px 11px;
+      min-height: 44px;
+      max-height: 160px;
       overflow-y: auto;
       caret-color: var(--accent-color, #5b7cf6);
       display: block;
@@ -373,8 +360,11 @@
     .chat-bar {
       display: flex;
       align-items: center;
-      padding: 6px 10px 8px 12px;
-      gap: 6px;
+      height: 28px;
+      padding: 0 6px 0 8px;
+      gap: 2px;
+      border-top: 1px solid var(--border-color, rgba(255,255,255,0.07));
+      background: transparent;
     }
 
     /* ── selectors group ─── */
@@ -386,61 +376,53 @@
       flex-wrap: wrap;
     }
 
-    /* base selector button */
+    /* base selector button — minimal style (Version A) */
     .sel-btn {
       position: relative;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: var(--radius-pill, 99px);
-      padding: 5px 10px 5px 8px;
+      gap: 3px;
+      background: none;
+      border: none;
+      border-radius: 3px;
+      padding: 2px 4px;
       cursor: pointer;
       font-family: inherit;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 400;
-      color: var(--secondary-text, #8a8a96);
-      transition: border-color 0.18s, background 0.18s, color 0.18s;
+      color: var(--secondary-text, #858585);
+      transition: background 0.1s, color 0.1s;
       white-space: nowrap;
       user-select: none;
     }
 
     .sel-btn:hover {
-      border-color: rgba(255,255,255,0.09);
-      color: var(--text-color);
       background: rgba(255,255,255,0.06);
+      color: var(--text-color);
     }
 
     .sel-btn:focus-visible { outline: 2px solid var(--accent-color, #5b7cf6); outline-offset: 2px; }
 
     /* active mode state (agent) */
     .sel-btn.active {
-      border-color: rgba(91,124,246,0.4);
-      background: rgba(91,124,246,0.15);
-      color: #a5b8fb;
+      color: var(--accent-color, #5b7cf6);
     }
 
     .sel-btn.active .sel-dot {
       background: var(--accent-color, #5b7cf6);
-      box-shadow: 0 0 6px var(--accent-color, #5b7cf6);
     }
 
     /* model active state (green) */
     .sel-btn.model-active {
-      border-color: rgba(52,211,153,0.3);
-      background: rgba(52,211,153,0.12);
-      color: #6ee7b7;
+      color: #4ec9b0;
     }
 
     .sel-btn.model-active .sel-dot {
-      background: #34d399;
-      box-shadow: 0 0 6px #34d399;
+      background: #4ec9b0;
     }
 
     /* empty model state (red) */
     .sel-btn.model-empty {
-      border-color: rgba(241, 76, 76, 0.35);
       color: var(--vscode-errorForeground, #f14c4c);
     }
 
@@ -455,19 +437,19 @@
     }
 
     .sel-dot {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
       background: var(--secondary-text, #52525c);
       flex-shrink: 0;
-      transition: background 0.2s, box-shadow 0.2s;
+      transition: background 0.2s;
     }
 
     .sel-icon {
-      width: 14px;
-      height: 14px;
+      width: 13px;
+      height: 13px;
       flex-shrink: 0;
-      opacity: 0.7;
+      opacity: 0.55;
     }
 
     .sel-label {
@@ -491,8 +473,8 @@
     /* divider between selectors */
     .sel-divider {
       width: 1px;
-      height: 14px;
-      background: rgba(255,255,255,0.05);
+      height: 11px;
+      background: rgba(255,255,255,0.1);
       flex-shrink: 0;
       margin: 0 2px;
     }
@@ -511,11 +493,20 @@
 
     .dropdown-menu {
       position: absolute;
-      bottom: calc(100% + 6px);
+      bottom: calc(100% + 4px);
       left: 0;
-      background: var(--input-bg, #1a1a1c);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: var(--radius-inner, 13px);
+      background: #252526;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      min-width: 175px;
+      padding: 3px;
+      z-index: 100;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(3px) scale(0.98);
+      pointer-events: none;
+      transition: opacity 0.13s cubic-bezier(.16,1,.3,1), transform 0.13s cubic-bezier(.16,1,.3,1);
+    }
       min-width: 180px;
       padding: 5px;
       z-index: 100;
@@ -533,34 +524,34 @@
     }
 
     .dropdown-header {
-      font-size: 10px;
-      letter-spacing: 0.08em;
+      font-size: 9px;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--secondary-text, #52525c);
-      padding: 4px 10px 6px;
+      padding: 3px 8px 2px;
       font-weight: 500;
     }
 
     .dropdown-item {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 7px 10px;
-      border-radius: 8px;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 3px;
       cursor: pointer;
-      font-size: 13px;
-      color: var(--secondary-text, #8a8a96);
-      transition: background 0.12s, color 0.12s;
+      font-size: 11.5px;
+      color: var(--secondary-text, #858585);
+      transition: background 0.1s, color 0.1s;
       border: none;
       background: none;
       width: 100%;
-      font-family: var(--vscode-font-family, -apple-system, sans-serif);
+      font-family: inherit;
       text-align: left;
       position: relative;
     }
 
     .dropdown-item:hover { background: rgba(255,255,255,0.05); color: var(--text-color); }
-    .dropdown-item:focus-visible { outline: 2px solid var(--accent-color, #5b7cf6); border-radius: 8px; }
+    .dropdown-item:focus-visible { outline: 1px solid var(--accent-color, #5b7cf6); border-radius: 3px; }
 
     .dropdown-item.selected {
       color: var(--text-color);
@@ -569,27 +560,26 @@
     .dropdown-item.selected::after {
       content: '';
       position: absolute;
-      right: 10px;
+      right: 8px;
       top: 50%;
       transform: translateY(-50%);
-      width: 6px;
-      height: 6px;
+      width: 4px;
+      height: 4px;
       border-radius: 50%;
       background: var(--accent-color, #5b7cf6);
-      box-shadow: 0 0 8px var(--accent-color, #5b7cf6);
     }
 
     .dropdown-item-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 7px;
-      background: rgba(255,255,255,0.06);
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.07);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      font-size: 13px;
+      font-size: 11px;
     }
 
     .dropdown-item-info { flex: 1; overflow: hidden; }
@@ -607,20 +597,20 @@
       flex-shrink: 0;
     }
 
-    /* ── send button (new design) ─── */
+    /* ── send button (Version A style) ─── */
     .send-btn {
       background: rgba(255,255,255,0.04);
-      border: none;
-      border-radius: 10px;
-      width: 30px;
-      height: 30px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 4px;
+      width: 22px;
+      height: 22px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       color: var(--secondary-text, #52525c);
       flex-shrink: 0;
-      transition: background 0.2s cubic-bezier(.16,1,.3,1), border-color 0.2s, color 0.2s, transform 0.15s;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
       margin-left: 4px;
     }
 
@@ -628,30 +618,27 @@
       background: var(--accent-color, #5b7cf6);
       border-color: transparent;
       color: #fff;
-      box-shadow: 0 2px 12px rgba(91,124,246,0.25);
     }
 
     .send-btn.ready:hover {
-      background: #6b8cf8;
-      transform: scale(1.04);
-      box-shadow: 0 4px 20px rgba(91,124,246,0.25);
+      opacity: 0.85;
+      transform: scale(1.07);
     }
 
     .send-btn.streaming {
       background: var(--vscode-errorForeground, #f44336);
       border-color: transparent;
       color: #fff;
-      box-shadow: 0 2px 12px rgba(244,67,54,0.3);
     }
 
     .send-btn.streaming:hover {
-      background: #e53935;
-      transform: scale(1.04);
+      opacity: 0.85;
+      transform: scale(1.07);
     }
 
-    .send-btn:active { transform: scale(0.95); }
+    .send-btn:active { transform: scale(0.92); }
     .send-btn:focus-visible { outline: 2px solid var(--accent-color, #5b7cf6); outline-offset: 2px; }
-    .send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .send-btn:disabled { opacity: 0.22; cursor: not-allowed; transform: none; }
 
     /* ── Reasoning / Thinking Indicator ─── */
     .reasoning-indicator {
