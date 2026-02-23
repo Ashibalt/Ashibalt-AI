@@ -476,7 +476,7 @@ export class ChatViewProvider implements WebviewViewProvider {
           break;
         }
         case "showHistory": {
-           this.postMessage({ type: "updateHistory", sessions: this.sessions });
+           this.postMessage({ type: "updateHistory", sessions: this.sessions, currentSessionId: this.currentSessionId });
            break;
         }
         case "forgetMessages": {
@@ -1206,7 +1206,7 @@ export class ChatViewProvider implements WebviewViewProvider {
             this.postMessage({ type: 'clearChat' });
           }
         }
-        this.postMessage({ type: 'updateHistory', sessions: this.sessions });
+        this.postMessage({ type: 'updateHistory', sessions: this.sessions, currentSessionId: this.currentSessionId });
       }
     } catch (e) {
       logger.error('syncSessionsFromDisk error', e);
@@ -1980,7 +1980,7 @@ export class ChatViewProvider implements WebviewViewProvider {
       }
 
       this.saveHistory();
-      this.postMessage({ type: 'updateHistory', sessions: this.sessions });
+      this.postMessage({ type: 'updateHistory', sessions: this.sessions, currentSessionId: this.currentSessionId });
       // Signal that the new session is ready — unlocks saveChatState in webview
       this.postMessage({ type: 'sessionLoaded' });
     })().catch(e => logger.error('resetConversation async error', e));
@@ -2012,7 +2012,7 @@ export class ChatViewProvider implements WebviewViewProvider {
           this.postMessage({ type: "clearChat" });
         }
 
-        this.postMessage({ type: "updateHistory", sessions: this.sessions });
+        this.postMessage({ type: "updateHistory", sessions: this.sessions, currentSessionId: this.currentSessionId });
       })().catch(e => logger.error('deleteSession wrapper error', e));
   }
 

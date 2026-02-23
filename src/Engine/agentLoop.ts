@@ -7,7 +7,7 @@ import { prepareMessagesForApi, estimateTokenCount } from './SystemContext/conte
 import { getFileTime } from './SystemContext/contextCache';
 import { parseApiError, tryRecoverJSON } from './agentErrors';
 import { fetchOpenRouterWithTools, type ChatResponse } from './fetchWithTools';
-import { resolveOpenRouterProvider } from './providerAutoSelect';
+import { resolveOpenRouterProvider, markProviderRateLimited, ProviderSelection } from './providerAutoSelect';
 
 // Re-export parseApiError for consumers that import from agentLoop
 export { parseApiError } from './agentErrors';
@@ -250,9 +250,10 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
 
     // Make API request with automatic 429 retry (exponential backoff)
     let response: ChatResponse;
+    let providerRouting: ProviderSelection | null = null;
     try {
       // Auto-select OpenRouter provider with caching support
-      const providerRouting = await resolveOpenRouterProvider(model, apiKey, baseUrl);
+      providerRouting = await resolveOpenRouterProvider(model, apiKey, baseUrl);
 
       response = await fetchOpenRouterWithTools({
         baseUrl,
@@ -286,17 +287,53 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       const { summary, details } = parseApiError(apiError);
       const rawMsg = apiError?.message || String(apiError);
 
+      let rateLimitedProviderName: string | undefined;
+      const detailsJsonStart = details.indexOf('{');
+      if (detailsJsonStart !== -1) {
+        try {
+          const parsed = JSON.parse(details.slice(detailsJsonStart));
+          rateLimitedProviderName = parsed?.error?.metadata?.provider_name || undefined;
+        } catch {}
+      }
+      if (!rateLimitedProviderName) {
+        const rawJsonStart = rawMsg.indexOf('{');
+        if (rawJsonStart !== -1) {
+          try {
+            const parsed = JSON.parse(rawMsg.slice(rawJsonStart));
+            rateLimitedProviderName = parsed?.error?.metadata?.provider_name || undefined;
+          } catch {}
+        }
+      }
+
       // Auto-retry on 429 rate limit errors with exponential backoff
       // Check both parsed summary (Russian) and raw error message (contains HTTP status)
       const is429 = rawMsg.includes('(429)') || summary.includes('429') || summary.includes('лимит запросов') || summary.toLowerCase().includes('rate limit') || summary.toLowerCase().includes('too many requests');
+      if (is429 && rateLimitedProviderName) {
+        markProviderRateLimited(model, rateLimitedProviderName);
+      }
       if (is429 && consecutiveRateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
         consecutiveRateLimitRetries++;
         const backoffMs = Math.min(2000 * Math.pow(2, consecutiveRateLimitRetries), 30000); // 4s, 8s, 16s
-        logger.log(`[AGENT] 429 rate limit hit — auto-retry ${consecutiveRateLimitRetries}/${MAX_RATE_LIMIT_RETRIES} after ${backoffMs}ms`);
+        logger.log(`[AGENT] 429 rate limit hit${rateLimitedProviderName ? ` (provider=${rateLimitedProviderName})` : ''} — auto-retry ${consecutiveRateLimitRetries}/${MAX_RATE_LIMIT_RETRIES} after ${backoffMs}ms`);
         postMessage({ type: 'streamResponse', content: accumulatedContent + `\n\n⏳ *Rate limit — автоматический повтор через ${Math.round(backoffMs / 1000)}с...*`, id: assistantPlaceholderId, tokenCount: 0, modelName: effectiveModel });
         lastApiCallTime = Date.now() + backoffMs; // Prevent next iteration from firing too soon
         await new Promise(resolve => setTimeout(resolve, backoffMs));
         continue; // Retry the same iteration
+      }
+
+      // Auto-retry on 404 "No endpoints found" errors — blacklist the provider for 1h
+      const is404 = rawMsg.includes('(404)') || summary.includes('404') ||
+        rawMsg.toLowerCase().includes('no endpoints') || summary.toLowerCase().includes('no endpoints');
+      if (is404 && consecutiveRateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
+        const failedProvider = rateLimitedProviderName || providerRouting?.order?.[0];
+        if (failedProvider) {
+          markProviderRateLimited(model, failedProvider, 60 * 60 * 1000); // blacklist 1h
+          logger.log(`[AGENT] 404 "No endpoints" (provider=${failedProvider}) — blacklisted 1h, retrying`);
+        }
+        consecutiveRateLimitRetries++;
+        postMessage({ type: 'streamResponse', content: accumulatedContent + `\n\n⚠️ *Провайдер недоступен — переключение...*`, id: assistantPlaceholderId, tokenCount: 0, modelName: effectiveModel });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue; // Retry with a different provider
       }
 
       const wrapped = new Error(summary) as any;
@@ -451,6 +488,26 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
         'terminal_input': 'write_to_terminal',
         'stdin': 'write_to_terminal',
         'send_input': 'write_to_terminal',
+        // lsp variants
+        'go_to_definition': 'lsp',
+        'find_definition': 'lsp',
+        'get_definition': 'lsp',
+        'find_references': 'lsp',
+        'get_references': 'lsp',
+        'hover': 'lsp',
+        'get_hover': 'lsp',
+        'get_type': 'lsp',
+        'find_symbols': 'lsp',
+        'document_symbols': 'lsp',
+        'rename_symbol': 'lsp',
+        'find_implementations': 'lsp',
+        'get_implementations': 'lsp',
+        'lsp_hover': 'lsp',
+        'lsp_definitions': 'lsp',
+        'lsp_references': 'lsp',
+        'lsp_symbols': 'lsp',
+        'lsp_rename': 'lsp',
+        'lsp_bridge': 'lsp',
       };
       const remappedName = TOOL_NAME_REMAP[toolName];
       if (remappedName) {
@@ -814,7 +871,7 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
 
       // list_files, diagnose, run_tests, find_references, fetch_url — 
       // these tools execute normally but do NOT show UI indicators or save actions.
-      // Only 7 tools get visible indicators: read_file, edit_file, create_file, delete_file, search, terminal, web_search
+      // Only 8 tools get visible indicators: read_file, edit_file, create_file, delete_file, search, terminal, web_search, lsp
 
       // Send search result for UI accordion
       if (toolName === 'search') {
@@ -852,6 +909,27 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
           query: args.query || '',
           resultsCount: result?.results_count || 0,
           success: result?.success ?? false
+        });
+      }
+
+      // Send LSP result for UI accordion
+      if (toolName === 'lsp') {
+        const lspSuccess = result?.success ?? false;
+        postMessage({
+          type: 'lspResult',
+          id: assistantPlaceholderId,
+          success: lspSuccess,
+          operation: args.operation || '',
+          filePath: args.file_path || '',
+          results: result?.results || '',
+          resultsCount: result?.results_count || 0
+        });
+        collectedActions.push({
+          type: 'lsp_bridge' as const,
+          operation: args.operation || '',
+          filePath: args.file_path || '',
+          resultsCount: result?.results_count || 0,
+          success: lspSuccess
         });
       }
 

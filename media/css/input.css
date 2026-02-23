@@ -66,70 +66,103 @@
       text-align: left;
     }
 
-    /* Metrics Dashboard — compact 20px strip with pipe separators */
+    /* Floating Metrics Button + Popover */
+    .metrics-fab-wrap {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 130;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    }
+
+    .metrics-fab-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    border-radius: 4px;
+    /* background: #4fd6ffa8; */
+    background: var(--accent-color, #5b7cf6);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.12s 
+ease, color 0.12s 
+ease, border-color 0.12s 
+ease;
+    }
+
+    .metrics-fab-btn:hover {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-color);
+      border-color: rgba(255,255,255,0.18);
+    }
+
+    .metrics-fab-btn .codicon {
+      font-size: 13px;
+    }
+
+    .metrics-popover {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 6px);
+      width: 190px;
+      min-height: 91px;
+      padding: 8px;
+      background: #252526;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(3px) scale(0.98);
+      pointer-events: none;
+      transition: opacity 0.13s cubic-bezier(.16,1,.3,1), transform 0.13s cubic-bezier(.16,1,.3,1);
+    }
+
+    .metrics-fab-btn:hover + .metrics-popover,
+    .metrics-fab-wrap.open .metrics-popover {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
     .metrics-dashboard {
-      display: none;
-      align-items: center;
-      height: 20px;
-      padding: 0;
-      font-size: 9.5px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 5px;
+      font-size: 11px;
+      line-height: 1.3;
       color: var(--secondary-text, #8a8a96);
-      background: transparent;
-      border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.07));
-      gap: 0;
+    }
+
+    .metrics-line {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .metrics-key {
+      color: var(--text-color);
+      opacity: 0.82;
+      min-width: 64px;
       flex-shrink: 0;
     }
 
-    .metrics-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 0 7px;
-      height: 100%;
-      border-right: 1px solid var(--border-color, rgba(255,255,255,0.07));
-      white-space: nowrap;
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 9.5px;
-      color: var(--secondary-text, #858585);
+    .metrics-value {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #73ab6d;
     }
 
-    .metrics-item:last-child {
-      border-right: none;
-    }
-
-    .metrics-item .codicon {
-      font-size: 11px;
-      opacity: 0.55;
-    }
-
-    .metrics-separator {
-      display: none;
-    }
-
-    .metrics-cache {
-      color: var(--accent-color, #5b7cf6);
-    }
-
-    .metrics-no-cache {
-      opacity: 0.3;
-    }
-
-    /* When pending-changes dashboard is above metrics inside input-container */
-    .has-pending .chat-card,
-    .has-metrics .chat-card {
-      border-radius: 0;
-    }
-
-    .has-pending.has-metrics .chat-card {
-      border-radius: 0;
-    }
-
-    .has-metrics .metrics-dashboard {
-      margin-bottom: 0;
-    }
-
-    .has-pending .metrics-dashboard {
-      border-radius: 0;
+    .metrics-value.metrics-no-cache {
+      color: var(--secondary-text, #8a8a96);
+      opacity: 0.7;
     }
 
     /* Usage Metrics Panel (in Settings) */
@@ -270,13 +303,14 @@
     /* Input Area */
     .input-container {
       padding: 0 0 0 0;
-      margin: 0;
-      background: var(--input-bg, #1a1a1c);
+      margin: 5px 5px 8px 8px;
       border: 1px solid var(--border-color, rgba(255,255,255,0.07));
       border-radius: 8px;
       display: flex;
       flex-direction: column;
       gap: 0;
+      position: relative;
+      overflow: visible;
     }
 
     /* Context Chips */
@@ -316,9 +350,8 @@
 
     /* ── Main Input Card ─── */
     .chat-card {
-      background: transparent;
+      background: #313131;
       border: none;
-      border-radius: 0;
       box-shadow: none;
       position: relative;
       overflow: visible;
@@ -361,9 +394,9 @@
       display: flex;
       align-items: center;
       height: 28px;
+      margin-bottom: 9px;
       padding: 0 6px 0 8px;
       gap: 2px;
-      border-top: 1px solid var(--border-color, rgba(255,255,255,0.07));
       background: transparent;
     }
 
@@ -371,7 +404,7 @@
     .selectors {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 16px;
       flex: 1;
       flex-wrap: wrap;
     }
@@ -388,12 +421,11 @@
       padding: 2px 4px;
       cursor: pointer;
       font-family: inherit;
-      font-size: 11.5px;
+      font-size: 12.5px;
       font-weight: 400;
-      color: var(--secondary-text, #858585);
+      color: #b9b9b9;
       transition: background 0.1s, color 0.1s;
       white-space: nowrap;
-      user-select: none;
     }
 
     .sel-btn:hover {
@@ -403,19 +435,13 @@
 
     .sel-btn:focus-visible { outline: 2px solid var(--accent-color, #5b7cf6); outline-offset: 2px; }
 
-    /* active mode state (agent) */
-    .sel-btn.active {
-      color: var(--accent-color, #5b7cf6);
-    }
+
 
     .sel-btn.active .sel-dot {
       background: var(--accent-color, #5b7cf6);
     }
 
-    /* model active state (green) */
-    .sel-btn.model-active {
-      color: #4ec9b0;
-    }
+
 
     .sel-btn.model-active .sel-dot {
       background: #4ec9b0;
@@ -507,15 +533,7 @@
       pointer-events: none;
       transition: opacity 0.13s cubic-bezier(.16,1,.3,1), transform 0.13s cubic-bezier(.16,1,.3,1);
     }
-      min-width: 180px;
-      padding: 5px;
-      z-index: 100;
-      box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
-      opacity: 0;
-      transform: translateY(6px) scale(0.97);
-      pointer-events: none;
-      transition: opacity 0.18s cubic-bezier(.16,1,.3,1), transform 0.18s cubic-bezier(.16,1,.3,1);
-    }
+
 
     .dropdown-menu.open {
       opacity: 1;
@@ -541,7 +559,6 @@
       cursor: pointer;
       font-size: 11.5px;
       color: var(--secondary-text, #858585);
-      transition: background 0.1s, color 0.1s;
       border: none;
       background: none;
       width: 100%;
@@ -599,19 +616,20 @@
 
     /* ── send button (Version A style) ─── */
     .send-btn {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 4px;
-      width: 22px;
-      height: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--secondary-text, #52525c);
-      flex-shrink: 0;
-      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
-      margin-left: 4px;
+    background: rgb(99, 99, 99);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    width: 44px;
+    height: 27px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #cfcfcf;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    margin-left: 4px;
     }
 
     .send-btn.ready {

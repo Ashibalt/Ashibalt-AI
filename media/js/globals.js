@@ -35,6 +35,8 @@
     const attachFileBtn = document.getElementById('attach-file-btn');
     const modelSelector = document.getElementById('model-selector');
     const modelDropdown = document.getElementById('model-dropdown');
+    const metricsFabWrap = document.getElementById('metrics-fab-wrap');
+    const metricsFabBtn = document.getElementById('metrics-fab-btn');
     
     // SVG icons for send button states
     const SEND_ICON_SVG = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';

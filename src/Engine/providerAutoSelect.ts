@@ -38,16 +38,59 @@ export interface ProviderSelection {
   allow_fallbacks: boolean;
 }
 
+function normalizeProviderRoutingName(name: string): string {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-');
+}
+
 // ── Сессионный кэш ──────────────────────────────────
 
 const providerCache = new Map<string, ProviderSelection | null>();
+const providerRateLimitUntil = new Map<string, number>();
 
 /**
  * Сбросить кэш (для тестов или при необходимости).
  */
 export function clearProviderCache(): void {
   providerCache.clear();
+  providerRateLimitUntil.clear();
   logger.log('[ProviderAutoSelect] Cache cleared');
+}
+
+function providerCooldownKey(modelId: string, providerName: string): string {
+  return `${modelId}::${normalizeProviderRoutingName(providerName)}`;
+}
+
+function isProviderRateLimited(modelId: string, providerName: string): boolean {
+  const key = providerCooldownKey(modelId, providerName);
+  const until = providerRateLimitUntil.get(key);
+  if (!until) return false;
+  if (Date.now() >= until) {
+    providerRateLimitUntil.delete(key);
+    return false;
+  }
+  return true;
+}
+
+export function markProviderRateLimited(modelId: string, providerName: string, ttlMs = 10 * 60 * 1000): void {
+  if (!modelId || !providerName) return;
+
+  const normalized = normalizeProviderRoutingName(providerName) || providerName;
+  const key = providerCooldownKey(modelId, normalized);
+  const until = Date.now() + Math.max(1_000, ttlMs);
+  providerRateLimitUntil.set(key, until);
+
+  const cached = providerCache.get(modelId);
+  if (cached?.order?.some(p => normalizeProviderRoutingName(p) === normalized)) {
+    providerCache.delete(modelId);
+    logger.log(`[ProviderAutoSelect] Dropped cache for "${modelId}" because provider "${normalized}" is rate-limited`);
+  }
+
+  logger.log(`[ProviderAutoSelect] Marked provider "${providerName}" (routing="${normalized}") as rate-limited for "${modelId}" until ${new Date(until).toISOString()}`);
 }
 
 // ── Основная функция ─────────────────────────────────
@@ -55,7 +98,7 @@ export function clearProviderCache(): void {
 /**
  * Определяет оптимальный провайдер OpenRouter с поддержкой prompt caching.
  *
- * @returns `{ order: [providerName], allow_fallbacks: true }` — если провайдер выбран
+ * @returns `{ order: [providerName], allow_fallbacks: false }` — если провайдер выбран (жёсткий выбор)
  *          `null` — если автовыбор отключён (нет кэш-провайдеров или слишком дорого)
  */
 export async function resolveOpenRouterProvider(
@@ -71,8 +114,13 @@ export async function resolveOpenRouterProvider(
   // Cache hit
   if (providerCache.has(modelId)) {
     const cached = providerCache.get(modelId)!;
+    if (cached?.order?.some(p => isProviderRateLimited(modelId, p))) {
+      providerCache.delete(modelId);
+      logger.log(`[ProviderAutoSelect] Cache STALE for "${modelId}" (selected provider is rate-limited), recomputing...`);
+    } else {
     logger.log(`[ProviderAutoSelect] Cache HIT for "${modelId}" → ${cached ? cached.order[0] : 'null (auto)'}`);
     return cached;
+    }
   }
 
   logger.log(`[ProviderAutoSelect] Cache MISS for "${modelId}", fetching endpoints...`);
@@ -101,7 +149,7 @@ export async function resolveOpenRouterProvider(
 
     if (!endpoints || !Array.isArray(endpoints) || endpoints.length === 0) {
       logger.log(`[ProviderAutoSelect] No endpoints found for "${modelId}"`);
-      providerCache.set(modelId, null);
+      // Do NOT cache null — empty endpoints may be transient (all providers blacklisted or API hiccup)
       return null;
     }
 
@@ -117,6 +165,12 @@ export async function resolveOpenRouterProvider(
       const hasCaching = pricing.input_cache_read !== undefined && pricing.input_cache_read !== null;
       const cacheReadPrice = hasCaching ? parseFloat(pricing.input_cache_read!) : 0;
 
+      const routingName = normalizeProviderRoutingName(ep.provider_name) || ep.provider_name;
+      if (isProviderRateLimited(modelId, routingName)) {
+        logger.log(`[ProviderAutoSelect]   ⏭ skip "${ep.provider_name}" (routing="${routingName}") — temporary rate-limited`);
+        continue;
+      }
+
       if (hasCaching && !isNaN(cacheReadPrice)) {
         withCache.push({ endpoint: ep, promptPrice, cacheReadPrice });
         logger.log(`[ProviderAutoSelect]   ✓ "${ep.provider_name}" — кэширование: prompt=$${promptPrice}, cache_read=$${cacheReadPrice}`);
@@ -126,9 +180,23 @@ export async function resolveOpenRouterProvider(
       }
     }
 
-    // Нет провайдеров с кэшированием — автовыбор отключён
+    // Нет провайдеров с кэшированием — fallback к самому дешёвому без кэша
     if (withCache.length === 0) {
-      logger.log(`[ProviderAutoSelect] No caching providers for "${modelId}" → null`);
+      if (withoutCache.length > 0) {
+        withoutCache.sort((a, b) => a.promptPrice - b.promptPrice);
+        const bestNoCache = withoutCache[0];
+        const providerName = bestNoCache.endpoint.provider_name;
+        const providerRoutingName = normalizeProviderRoutingName(providerName) || providerName;
+        const selection: ProviderSelection = {
+          order: [providerRoutingName],
+          allow_fallbacks: false
+        };
+        logger.log(`[ProviderAutoSelect] No caching providers for "${modelId}" → selected non-cache "${providerName}" (routing="${providerRoutingName}", fallbacks=false)`);
+        providerCache.set(modelId, selection);
+        return selection;
+      }
+
+      logger.log(`[ProviderAutoSelect] No available providers left for "${modelId}" (all filtered/rate-limited) → null`);
       providerCache.set(modelId, null);
       return null;
     }
@@ -151,12 +219,15 @@ export async function resolveOpenRouterProvider(
       }
     }
 
+    const providerName = best.endpoint.provider_name;
+    const providerRoutingName = normalizeProviderRoutingName(providerName) || providerName;
+
     const selection: ProviderSelection = {
-      order: [best.endpoint.provider_name],
-      allow_fallbacks: true
+      order: [providerRoutingName],
+      allow_fallbacks: false
     };
 
-    logger.log(`[ProviderAutoSelect] ✓ Selected "${best.endpoint.provider_name}" for "${modelId}" (prompt=$${best.promptPrice}, cache_read=$${best.cacheReadPrice})`);
+    logger.log(`[ProviderAutoSelect] ✓ Selected "${providerName}" → routing "${providerRoutingName}" for "${modelId}" (prompt=$${best.promptPrice}, cache_read=$${best.cacheReadPrice}, fallbacks=false)`);
     providerCache.set(modelId, selection);
     return selection;
   } catch (error: any) {

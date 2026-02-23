@@ -476,6 +476,9 @@
         description = args.file_path;
       } else if (toolName === 'fetch_url' && args && args.url) {
         description = args.url;
+      } else if (toolName === 'lsp' && args) {
+        const opLabels = { definitions: 'Определение', references: 'Ссылки', hover: 'Информация', symbols: 'Символы', type_definition: 'Тип', implementations: 'Реализации', rename_preview: 'Превью переименования' };
+        description = (opLabels[args.operation] || args.operation || 'lsp') + ': ' + (args.file_path || '');
       }
 
       const toolLabels = {
@@ -484,7 +487,8 @@
         'search': 'Поиск',
         'web_search': 'Веб-поиск',
         'diagnose': 'Диагностика',
-        'fetch_url': 'Загрузить URL'
+        'fetch_url': 'Загрузить URL',
+        'lsp': 'LSP Запрос'
       };
       const label = toolLabels[toolName] || toolName;
 
@@ -884,6 +888,122 @@
       newSegment.dataset.segmentIdx = String(newSegmentIdx);
       newSegment.dataset.raw = '';
       messageContent.appendChild(newSegment);
+      
+      scrollToBottom();
+    }
+
+    // ============ LSP BRIDGE UI ============
+    function showLspResult(replyTo, success, operation, filePath, resultsText, resultsCount) {
+      let targetMsg = null;
+      if (replyTo) {
+        targetMsg = chatContainer.querySelector(`.message.assistant[data-msg-id="${replyTo}"]`);
+      }
+      if (!targetMsg) {
+        const assistants = chatContainer.querySelectorAll('.message.assistant');
+        targetMsg = assistants.length > 0 ? assistants[assistants.length - 1] : null;
+      }
+      if (!targetMsg) return;
+      
+      const messageContent = targetMsg.querySelector('.message-content');
+      if (!messageContent) return;
+      
+      const actionEl = document.createElement('div');
+      actionEl.className = 'lsp-action ' + (success ? 'success' : 'error');
+
+      const operationLabels = {
+        'definitions': 'Определение',
+        'references': 'Ссылки',
+        'hover': 'Информация',
+        'symbols': 'Символы',
+        'type_definition': 'Тип',
+        'implementations': 'Реализации',
+        'rename_preview': 'Превью переименования'
+      };
+      const label = operationLabels[operation] || operation;
+      const fileName = filePath ? filePath.split(/[\\/]/).pop() : '';
+
+      if (!success || resultsCount === 0) {
+        actionEl.innerHTML = `
+          <div class="lsp-header">
+            <span class="status-icon error">
+              <span class="codicon codicon-symbol-reference"></span>
+            </span>
+            <span class="lsp-title">${escapeHtml(label)}: ${escapeHtml(fileName)}</span>
+            <span class="lsp-count">0</span>
+          </div>
+        `;
+      } else {
+        // Parse results into lines for display
+        const resultLines = (resultsText || '').split('\n').filter(l => l.trim());
+        let resultsHtml = '<div class="lsp-results">';
+        
+        for (const line of resultLines) {
+          // Try to parse file:line:col — make it clickable
+          const fileMatch = line.match(/^(.+?):(\d+):(\d+)$/);
+          if (fileMatch) {
+            const [, file, lineNum] = fileMatch;
+            const fName = file.split(/[\\/]/).pop();
+            resultsHtml += `
+              <div class="lsp-result-item" data-file="${escapeHtml(file)}" data-line="${lineNum}">
+                <span class="codicon codicon-symbol-reference"></span>
+                <span class="result-file">${escapeHtml(fName)}</span>
+                <span class="result-line">:${lineNum}</span>
+              </div>
+            `;
+          } else {
+            resultsHtml += `<div style="padding: 1px 6px;">${escapeHtml(line)}</div>`;
+          }
+        }
+        resultsHtml += '</div>';
+
+        actionEl.innerHTML = `
+          <button class="lsp-header accordion-toggle">
+            <span class="status-icon success">
+              <span class="codicon codicon-symbol-reference"></span>
+            </span>
+            <span class="lsp-title">${escapeHtml(label)}: ${escapeHtml(fileName)}</span>
+            <span class="lsp-count">${resultsCount}</span>
+            <span class="accordion-icon">
+              <span class="codicon codicon-chevron-down"></span>
+            </span>
+          </button>
+          <div class="lsp-content collapsed">
+            ${resultsHtml}
+          </div>
+        `;
+        
+        // Accordion toggle
+        const header = actionEl.querySelector('.accordion-toggle');
+        const content = actionEl.querySelector('.lsp-content');
+        const icon = actionEl.querySelector('.accordion-icon');
+        
+        if (header && content) {
+          header.addEventListener('click', () => {
+            content.classList.toggle('collapsed');
+            if (icon) icon.classList.toggle('rotated');
+          });
+        }
+        
+        // Click to open files
+        actionEl.querySelectorAll('.lsp-result-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const file = item.dataset.file;
+            const line = parseInt(item.dataset.line) || 1;
+            vscode.postMessage({ type: 'openFile', filePath: file, line });
+          });
+        });
+      }
+      
+      messageContent.appendChild(actionEl);
+      
+      // Add new content segment after action
+      const lspSegments = messageContent.querySelectorAll('.content-segment');
+      const lspSegIdx = lspSegments.length;
+      const lspNewSeg = document.createElement('div');
+      lspNewSeg.className = 'content-segment';
+      lspNewSeg.dataset.segmentIdx = String(lspSegIdx);
+      lspNewSeg.dataset.raw = '';
+      messageContent.appendChild(lspNewSeg);
       
       scrollToBottom();
     }

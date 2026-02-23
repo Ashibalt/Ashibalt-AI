@@ -19,6 +19,17 @@
     window.__ICONS_URI = '{{iconsUri}}';
     window.__PROVIDER_ICONS_URI = '{{providerIconsUri}}';
   </script>
+  <style>
+  .chat-textarea::placeholder {
+    font-family: sans-serif;
+    font-size: 13px;
+    color: rgb(145, 145, 145);
+  }
+  .chat-textarea {
+    font-family: sans-serif;
+    letter-spacing: 0.5px;
+  }
+</style>
 </head>
 <body>
   <!-- History Sidebar (Variant C) -->
@@ -117,6 +128,15 @@
 
   <div class="input-container">
 
+    <div class="metrics-fab-wrap" id="metrics-fab-wrap" style="display: none;">
+      <button class="metrics-fab-btn" id="metrics-fab-btn" title="Метрики" aria-label="Показать метрики" aria-expanded="false">
+        <span class="codicon codicon-pulse"></span>
+      </button>
+      <div class="metrics-popover" id="metrics-popover">
+        <div class="metrics-dashboard" id="metrics-dashboard"></div>
+      </div>
+    </div>
+
     <!-- Pending Changes Dashboard (inside input-container for unified panel styling) -->
     <div class="pending-changes-dashboard" id="pending-changes-dashboard" style="display: none;">
       <div class="dashboard-header">
@@ -144,20 +164,12 @@
       </div>
     </div>
 
-    <!-- Model Dropdown -->
-    <div class="model-dropdown" id="model-dropdown">
-      <!-- Models injected here -->
-    </div>
-
-    <div class="context-bar" id="context-bar">
-      <!-- Context chips will appear here -->
-    </div>
 
     <div class="chat-card" role="group" aria-label="Чат ввод">
       <textarea
         class="chat-textarea"
         id="message-input"
-        placeholder="Задай вопрос или нажми / для команд…"
+        placeholder="Напиши, что нужно сделать..."
         rows="1"
         aria-label="Поле сообщения"
         aria-multiline="true"
@@ -176,14 +188,6 @@
               aria-expanded="false"
               title="Режим работы"
             >
-              <span class="sel-dot"></span>
-              <svg class="sel-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
-                <rect x="4" y="6" width="8" height="7" rx="1.5"/>
-                <path d="M5.5 9.5h1M9.5 9.5h1"/>
-                <path d="M8 6V4"/>
-                <circle cx="8" cy="3.5" r="1"/>
-                <path d="M2 9h2M12 9h2"/>
-              </svg>
               <span class="sel-label" id="mode-label">Agent</span>
               <svg class="sel-chevron" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6">
                 <path d="M2 3.5l3 3 3-3"/>
@@ -215,8 +219,6 @@
             </div>
           </div>
 
-          <div class="sel-divider" aria-hidden="true"></div>
-
           <!-- Model selector -->
           <div class="dropdown-anchor" id="model-anchor">
             <button
@@ -226,17 +228,15 @@
               aria-expanded="false"
               title="Выбрать модель"
             >
-              <span class="sel-dot"></span>
-              <svg class="sel-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
-                <path d="M8 2v2M8 12v2M2 8h2M12 8h2"/>
-                <path d="M4.22 4.22l1.42 1.42M10.36 10.36l1.42 1.42M4.22 11.78l1.42-1.42M10.36 5.64l1.42-1.42"/>
-                <circle cx="8" cy="8" r="2"/>
-              </svg>
               <span class="sel-label" id="model-label">Модель</span>
               <svg class="sel-chevron" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6">
                 <path d="M2 3.5l3 3 3-3"/>
               </svg>
             </button>
+
+            <div class="model-dropdown" id="model-dropdown">
+              <!-- Models injected here -->
+            </div>
           </div>
         </div>
 

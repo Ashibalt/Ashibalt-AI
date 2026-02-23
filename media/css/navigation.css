@@ -127,6 +127,21 @@
       background: var(--icon-hover-bg);
     }
 
+    .history-item.active {
+      background: rgba(91, 124, 246, 0.1);
+      border-left: 3px solid var(--accent-color, #5b7cf6);
+      padding-left: 7px;
+      cursor: default;
+    }
+
+    .history-item.active:hover {
+      background: rgba(91, 124, 246, 0.14);
+    }
+
+    .history-item.active .hi-delete {
+      display: none;
+    }
+
     .hi-dot {
       width: 6px;
       height: 6px;
@@ -210,35 +225,35 @@
       color: var(--text-color);
     }
 
-    /* Model Dropdown (Curtain) */
+    /* Model Dropdown (same style as dropdown-menu) */
     .model-dropdown {
       position: absolute;
-      bottom: 60px;
+      bottom: calc(100% + 4px);
       left: 0;
-      right: 0;
-      background: var(--vscode-editorWidget-background, #252526);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
-      box-shadow: 0 -6px 24px rgba(0,0,0,0.35);
-      z-index: 50;
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.2s;
+      min-width: 175px;
+      max-width: 260px;
+      background: #252526;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      z-index: 100;
       opacity: 0;
+      transform: translateY(3px) scale(0.98);
       pointer-events: none;
+      transition: opacity 0.13s cubic-bezier(.16,1,.3,1), transform 0.13s cubic-bezier(.16,1,.3,1);
     }
 
     .model-dropdown.visible {
-      max-height: 340px;
       opacity: 1;
+      transform: translateY(0) scale(1);
       pointer-events: auto;
     }
 
     .model-dropdown-scroll {
-      max-height: 320px;
+      max-height: 280px;
       overflow-y: auto;
       overscroll-behavior: contain;
-      padding: 4px 0;
+      padding: 3px;
     }
 
     .model-dropdown-scroll::-webkit-scrollbar {
@@ -255,19 +270,19 @@
     }
 
     .model-option {
-      padding: 6px 12px;
+      padding: 7px 12px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin: 0 4px;
-      border-radius: 5px;
+      margin-top: 7px;
+      border-radius: 3px;
       transition: background 0.1s;
     }
 
     .model-option.active {
-      background: rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.05);
     }
 
     .model-option.active .name {
@@ -279,8 +294,8 @@
     }
 
     .model-option .name {
-      font-size: 12px;
-      color: var(--text-color);
+      font-size: 12.5px;
+      color: var(--secondary-text, #858585);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -288,18 +303,23 @@
       min-width: 0;
     }
 
+    .model-option:hover .name,
+    .model-option.active .name {
+      color: var(--text-color);
+    }
+
     .model-option .provider {
       font-size: 9px;
       color: var(--secondary-text);
-      opacity: 0.7;
+      opacity: 0.8;
       flex-shrink: 0;
       text-transform: uppercase;
       letter-spacing: 0.3px;
     }
 
     .model-dropdown .empty-models {
-      padding: 20px 16px;
-      font-size: 12px;
+      padding: 12px;
+      font-size: 11px;
       color: var(--secondary-text);
       text-align: center;
       opacity: 0.7;

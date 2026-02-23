@@ -18,6 +18,7 @@ import { createFileTool, deleteFileTool } from './tools/fileManagementTools';
 import { searchTool, getProjectTreeTool } from './tools/searchTools';
 import { runTerminalCommandTool, readTerminalOutputTool, writeToTerminalTool } from './tools/terminalTool';
 import { diagnoseTool } from './tools/diagnoseTool';
+import { lspBridgeTool } from './tools/lspBridgeTool';
 import { fetchUrlTool } from './tools/fetchUrlTool';
 import { webSearchTool } from './tools/webSearchTool';
 import { logger } from '../logger';
@@ -153,7 +154,8 @@ Set files_only=true to search by filename. Set file to search within a specific 
           },
           file: { type: 'string', description: 'Optional: search only in this file' },
           files_only: { type: 'boolean', description: 'Optional: search for file names only' },
-          include: { type: 'string', description: 'Optional: glob pattern (e.g. "**/*.ts")' }
+          include: { type: 'string', description: 'Optional: glob pattern (e.g. "**/*.ts")' },
+          case_sensitive: { type: 'boolean', description: 'Optional: when true, search is case-sensitive (default: false)' }
         },
         required: ['query']
       }
@@ -264,6 +266,55 @@ Returns the latest output after sending the input.`,
       }
     }
   },
+  {
+    type: 'function',
+    function: {
+      name: 'lsp',
+      description: `Query the IDE Language Server for code intelligence. This gives you precise, compiler-level information about code — far more accurate than text search.
+
+Operations:
+- "definitions" — Go to definition of symbol at position. Returns file path + line.
+- "references" — Find ALL usages of a symbol across the entire project. Essential before renaming or refactoring.
+- "hover" — Get type signature and documentation for a symbol.
+- "symbols" — List all symbols (functions, classes, variables, types) in a file with their line numbers. Does NOT require line/symbol_name.
+- "type_definition" — Go to the type definition (e.g., interface/class that defines the type).
+- "implementations" — Find all implementations of an interface or abstract class.
+- "rename_preview" — Preview what a rename would change (files + positions). Does NOT apply the rename. Requires "new_name".
+
+Position can be specified by line+character OR by symbol_name (auto-resolved via document symbols).`,
+      parameters: {
+        type: 'object',
+        properties: {
+          operation: {
+            type: 'string',
+            enum: ['definitions', 'references', 'hover', 'symbols', 'type_definition', 'implementations', 'rename_preview'],
+            description: 'The LSP operation to perform'
+          },
+          file_path: {
+            type: 'string',
+            description: 'Path to the file (absolute or relative to workspace)'
+          },
+          line: {
+            type: 'number',
+            description: '1-indexed line number. Required for all operations except "symbols" (unless symbol_name is provided)'
+          },
+          character: {
+            type: 'number',
+            description: '0-indexed character offset within the line. Defaults to 0 if omitted.'
+          },
+          symbol_name: {
+            type: 'string',
+            description: 'Name of the symbol to find. Alternative to line+character — the position is auto-resolved by searching document symbols.'
+          },
+          new_name: {
+            type: 'string',
+            description: 'New name for rename_preview operation'
+          }
+        },
+        required: ['operation', 'file_path']
+      }
+    }
+  },
 ];
 
 /**
@@ -271,7 +322,7 @@ Returns the latest output after sending the input.`,
  * Chat mode can read and search but NOT modify files or run commands.
  */
 export const chatTools: ToolSpec[] = tools.filter(t => 
-  ['read_file', 'list_files', 'search', 'diagnose', 'fetch_url', 'web_search', 'read_terminal_output'].includes(t.function.name)
+  ['read_file', 'list_files', 'search', 'diagnose', 'fetch_url', 'web_search', 'read_terminal_output', 'lsp'].includes(t.function.name)
 );
 
 /**
@@ -368,6 +419,25 @@ function validateToolArgs(toolName: string, args: any): string | null {
       }
       break;
 
+    case 'lsp': {
+      if (!args.file_path || typeof args.file_path !== 'string') {
+        return 'lsp requires file_path (string)';
+      }
+      const validOps = ['definitions', 'references', 'hover', 'symbols', 'type_definition', 'implementations', 'rename_preview'];
+      if (!args.operation || !validOps.includes(args.operation)) {
+        return `lsp requires operation (one of: ${validOps.join(', ')})`;
+      }
+      if (args.operation !== 'symbols') {
+        if (typeof args.line !== 'number' && typeof args.symbol_name !== 'string') {
+          return `lsp operation "${args.operation}" requires either "line" (number) or "symbol_name" (string)`;
+        }
+      }
+      if (args.operation === 'rename_preview' && (!args.new_name || typeof args.new_name !== 'string')) {
+        return 'lsp rename_preview requires new_name (string)';
+      }
+      break;
+    }
+
     default:
       break;
   }
@@ -453,6 +523,9 @@ export async function executeTool(toolName: string, args: any, workspaceRoot?: s
         break;
       case 'write_to_terminal':
         result = await writeToTerminalTool(args);
+        break;
+      case 'lsp':
+        result = await lspBridgeTool(args, workspaceRoot);
         break;
       default:
         throw new Error(`Unknown tool: ${toolName}`);

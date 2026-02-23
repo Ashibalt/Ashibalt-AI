@@ -331,60 +331,44 @@
     // ======== Metrics Dashboard ========
     function updateMetricsDashboard(metrics) {
       let dashboard = document.getElementById('metrics-dashboard');
-      if (!dashboard) {
-        dashboard = document.createElement('div');
-        dashboard.id = 'metrics-dashboard';
-        dashboard.className = 'metrics-dashboard';
-        // Insert inside input-container, above the chat-card
-        const inputCtr = document.querySelector('.input-container');
-        const chatCard = document.querySelector('.chat-card');
-        if (inputCtr && chatCard) {
-          inputCtr.insertBefore(dashboard, chatCard);
-        } else if (inputCtr) {
-          inputCtr.prepend(dashboard);
-        }
-      }
+      if (!dashboard) return;
 
       const inputK = (metrics.inputTokens / 1000).toFixed(1);
       const outputK = (metrics.outputTokens / 1000).toFixed(1);
       const ctxK = (metrics.currentContextTokens / 1000).toFixed(1);
       const limitK = metrics.contextLimit ? Math.round(metrics.contextLimit / 1000) : null;
       const ctxDisplay = limitK ? `${ctxK}K/${limitK}K` : `${ctxK}K`;
-
-      let cacheHtml = '';
-      if (metrics.cachedTokens !== undefined && metrics.cachedTokens > 0) {
-        const cachedK = (metrics.cachedTokens / 1000).toFixed(1);
-        cacheHtml = `
-        <span class="metrics-separator"></span>
-        <span class="metrics-item metrics-cache" title="Кэшированных токенов (prompt cache hit)">
-          <span class="codicon codicon-zap"></span> ${cachedK}K cache
-        </span>`;
-      } else {
-        cacheHtml = `
-        <span class="metrics-separator"></span>
-        <span class="metrics-item metrics-no-cache" title="Модель или провайдер не поддерживает кэширование промптов">
-          <span class="codicon codicon-circle-slash"></span> No cache
-        </span>`;
-      }
+      const cacheDisplay = metrics.cachedTokens !== undefined && metrics.cachedTokens > 0
+        ? `${(metrics.cachedTokens / 1000).toFixed(1)}K`
+        : 'No';
+      const cacheClass = metrics.cachedTokens !== undefined && metrics.cachedTokens > 0 ? '' : ' metrics-no-cache';
 
       dashboard.innerHTML = `
-        <span class="metrics-item" title="API-вызовов в этой задаче">
-          <span class="codicon codicon-arrow-swap"></span> ${metrics.apiCalls}
-        </span>
-        <span class="metrics-item" title="Входных токенов (суммарно)">
-          <span class="codicon codicon-arrow-down"></span> ${inputK}K
-        </span>
-        <span class="metrics-item" title="Выходных токенов (суммарно)">
-          <span class="codicon codicon-arrow-up"></span> ${outputK}K
-        </span>
-        <span class="metrics-item" title="Текущий контекст / Лимит модели">
-          <span class="codicon codicon-database"></span> ${ctxDisplay}
-        </span>${cacheHtml}
+        <div class="metrics-line" title="Лимит итераций в сессии">
+          <span class="metrics-key">Iteration:</span>
+          <span class="metrics-value">${metrics.apiCalls}</span>
+        </div>
+        <div class="metrics-line" title="Входные токены (суммарно)">
+          <span class="metrics-key">Input:</span>
+          <span class="metrics-value">${inputK}K</span>
+        </div>
+        <div class="metrics-line" title="Выходные токены (суммарно)">
+          <span class="metrics-key">Output:</span>
+          <span class="metrics-value">${outputK}K</span>
+        </div>
+        <div class="metrics-line" title="Текущий контекст / лимит модели">
+          <span class="metrics-key">Context:</span>
+          <span class="metrics-value">${ctxDisplay}</span>
+        </div>
+        <div class="metrics-line" title="Кэшированные токены (prompt cache hit)">
+          <span class="metrics-key">Cache hit:</span>
+          <span class="metrics-value${cacheClass}">${cacheDisplay}</span>
+        </div>
       `;
-      dashboard.style.display = 'flex';
-      // Signal input-container to connect chat-card visually
-      const inputCtr = dashboard.closest('.input-container');
-      if (inputCtr) inputCtr.classList.add('has-metrics');
+
+      if (metricsFabWrap) {
+        metricsFabWrap.style.display = 'flex';
+      }
     }
 
     // ===== Session Switch Confirmation Dialog =====

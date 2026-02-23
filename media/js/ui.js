@@ -303,7 +303,7 @@
       });
     }
 
-    function renderHistory(sessions) {
+    function renderHistory(sessions, currentSessionId) {
       historyList.innerHTML = '';
 
       // Filter chip logic
@@ -338,6 +338,9 @@
           }
           const item = document.createElement('div');
           item.className = 'history-item';
+          if (currentSessionId && session.id === currentSessionId) {
+            item.classList.add('active');
+          }
 
           // Dot
           const dot = document.createElement('span');
@@ -427,6 +430,32 @@
       document.addEventListener('click', (e) => {
         if (!modelSelector.contains(e.target) && !modelDropdown.contains(e.target)) {
           modelDropdown.classList.remove('visible');
+        }
+      });
+    }
+
+    if (metricsFabWrap && metricsFabBtn) {
+      let _metricsClickGuard = false;
+      metricsFabBtn.addEventListener('click', () => {
+        _metricsClickGuard = true;
+        const isOpen = metricsFabWrap.classList.contains('open');
+        metricsFabWrap.classList.toggle('open', !isOpen);
+        metricsFabBtn.setAttribute('aria-expanded', String(!isOpen));
+        setTimeout(() => { _metricsClickGuard = false; }, 0);
+      });
+
+      document.addEventListener('click', (e) => {
+        if (_metricsClickGuard) return;
+        if (!metricsFabWrap.contains(e.target)) {
+          metricsFabWrap.classList.remove('open');
+          metricsFabBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          metricsFabWrap.classList.remove('open');
+          metricsFabBtn.setAttribute('aria-expanded', 'false');
         }
       });
     }
@@ -779,7 +808,7 @@
             disabledOpt.textContent = 'Выключен';
             select.appendChild(disabledOpt);
           }
-          
+
           if (models && models.length > 0) {
             models.forEach(model => {
                 const opt = document.createElement('option');

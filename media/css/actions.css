@@ -1205,3 +1205,119 @@
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
+
+    /* ============================================
+       LSP Bridge Action
+       ============================================ */
+    .lsp-action {
+      margin: 8px 0;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 83%;
+    }
+
+    .lsp-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      cursor: default;
+      color: var(--text-color);
+      width: 100%;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .lsp-header.accordion-toggle {
+      cursor: pointer;
+      border-radius: 6px;
+      width: auto;
+      max-width: 83%;
+      transition: background 0.15s;
+    }
+
+    .lsp-header.accordion-toggle:hover {
+      background: rgba(128, 128, 128, 0.15);
+    }
+
+    .lsp-action .status-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lsp-action .status-icon.success .codicon {
+      color: #7ec8e3;
+    }
+
+    .lsp-action .status-icon.error .codicon {
+      color: var(--secondary-text);
+    }
+
+    .lsp-title {
+      flex: 1;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      font-family: sans-serif;
+      text-overflow: ellipsis;
+    }
+
+    .lsp-count {
+      background: rgba(126, 200, 227, 0.18);
+      color: #ababab;
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .lsp-content {
+      overflow: hidden;
+      max-height: 300px;
+      transition: max-height 0.25s ease, padding 0.25s ease;
+    }
+
+    .lsp-content.collapsed {
+      max-height: 0;
+      padding: 0;
+    }
+
+    .lsp-results {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 12px 12px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 11px;
+      white-space: pre-wrap;
+      color: var(--secondary-text);
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .lsp-result-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    .lsp-result-item:hover {
+      background: rgba(128, 128, 128, 0.15);
+    }
+
+    .lsp-result-item .result-file {
+      color: var(--text-color);
+      font-weight: 500;
+    }
+
+    .lsp-result-item .result-line {
+      color: var(--secondary-text);
+      font-size: 10px;
+    }

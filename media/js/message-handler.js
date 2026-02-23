@@ -123,9 +123,11 @@
           // Reset metrics dashboard
           const metricsDash = document.getElementById('metrics-dashboard');
           if (metricsDash) {
-            const inputCtr = metricsDash.closest('.input-container');
-            if (inputCtr) inputCtr.classList.remove('has-metrics');
-            metricsDash.remove();
+            metricsDash.innerHTML = '';
+          }
+          if (metricsFabWrap) {
+            metricsFabWrap.style.display = 'none';
+            metricsFabWrap.classList.remove('open');
           }
           window.__lastMetricsTokens = 0;
           break;
@@ -154,7 +156,7 @@
           }
           break;
         case 'updateHistory':
-          renderHistory(message.sessions);
+          renderHistory(message.sessions, message.currentSessionId);
           // Don't auto-show sidebar, only update data
           break;
         case 'updateModels':
@@ -418,6 +420,9 @@
           break;
         case 'searchResult':
           showCodeSearchResult(message.id, message.success, message.query, message.mode, message.results, message.totalResults);
+          break;
+        case 'lspResult':
+          showLspResult(message.id, message.success, message.operation, message.filePath, message.results, message.resultsCount);
           break;
         case 'terminalConfirm':
           showTerminalConfirmation(message.command, message.workingDir, message.id);

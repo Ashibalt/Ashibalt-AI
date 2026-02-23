@@ -4,14 +4,15 @@
 
     /* Pending Changes Dashboard */
     .pending-changes-dashboard {
-      margin: 0;
-      border-radius: 0;
-      font-size: 11px;
-      background: rgba(255,255,255,0.015);
-      border: none;
-      border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.07));
-      overflow: hidden;
-      flex-shrink: 0;
+    margin: 0;
+    border-radius: 0;
+    font-size: 11px;
+    background: #1e1e1e;
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
+    border-bottom: 1px solid #474747;
+    overflow: hidden;
+    flex-shrink: 0;
     }
 
     .dashboard-header {

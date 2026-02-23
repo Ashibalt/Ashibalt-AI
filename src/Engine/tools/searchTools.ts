@@ -48,6 +48,8 @@ export async function searchTool(args: any, workspaceRoot?: string): Promise<any
   } else {
     return { error: 'search requires query parameter (string or array of up to 15 strings)' };
   }
+
+  const caseSensitive = args?.case_sensitive === true;
   
   // Mode 1: Search for files by name/pattern
   if (args.files_only) {
@@ -75,11 +77,11 @@ export async function searchTool(args: any, workspaceRoot?: string): Promise<any
       
       const allMatches: Record<string, any[]> = {};
       for (const query of queries) {
-        const qLower = query.toLowerCase();
+        const qLower = caseSensitive ? query : query.toLowerCase();
         const matches: any[] = [];
         
         for (let i = 0; i < lines.length; i++) {
-          if (lines[i].toLowerCase().includes(qLower)) {
+          if ((caseSensitive ? lines[i] : lines[i].toLowerCase()).includes(qLower)) {
             const start = Math.max(0, i - contextRadius);
             const end = Math.min(lines.length, i + contextRadius + 1);
             const contextLines: string[] = [];
@@ -122,7 +124,7 @@ export async function searchTool(args: any, workspaceRoot?: string): Promise<any
   const files = await vscode.workspace.findFiles(includePattern, excludePattern, 200);
   const allResults: Record<string, any[]> = {};
   for (const q of queries) allResults[q] = [];
-  const queriesLower = queries.map(q => q.toLowerCase());
+  const queriesLower = queries.map(q => caseSensitive ? q : q.toLowerCase());
   const maxResultsPerQuery = 50;
   
   for (const fileUri of files) {
@@ -136,7 +138,7 @@ export async function searchTool(args: any, workspaceRoot?: string): Promise<any
       const relPath = path.relative(rootPath, fileUri.fsPath);
       
       for (let i = 0; i < lines.length; i++) {
-        const lineLower = lines[i].toLowerCase();
+        const lineLower = caseSensitive ? lines[i] : lines[i].toLowerCase();
         for (let qi = 0; qi < queriesLower.length; qi++) {
           if (allResults[queries[qi]].length >= maxResultsPerQuery) continue;
           if (lineLower.includes(queriesLower[qi])) {

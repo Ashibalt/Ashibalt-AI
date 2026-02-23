@@ -114,7 +114,15 @@ export interface FindReferencesAction {
   success: boolean;
 }
 
-export type MessageAction = TextAction | FileReadAction | FileEditAction | FileCreateAction | FileDeleteAction | TerminalAction | SearchAction | WebSearchAction | DiagnoseAction | ListFilesAction | FetchUrlAction | RunTestsAction | FindReferencesAction;
+export interface LspBridgeAction {
+  type: 'lsp_bridge';
+  operation: string;
+  filePath: string;
+  resultsCount: number;
+  success: boolean;
+}
+
+export type MessageAction = TextAction | FileReadAction | FileEditAction | FileCreateAction | FileDeleteAction | TerminalAction | SearchAction | WebSearchAction | DiagnoseAction | ListFilesAction | FetchUrlAction | RunTestsAction | FindReferencesAction | LspBridgeAction;
 
 // Legacy support
 export type FileAction = FileReadAction;
