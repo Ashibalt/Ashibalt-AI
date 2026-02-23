@@ -12,14 +12,15 @@
 
 - **Agent Mode** — autonomous code editing, file creation, terminal commands, iterative problem solving via agent loop
 - **Chat Mode** — read-only AI assistant with your codebase context
-- **8 Providers** — Ollama (local, free), OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Gemini
+- **Multi-Provider** — Ollama (local, free), OpenRouter, Mistral, DeepSeek.
 - **Model Browser** — search and add models directly from the UI
 - **Snapshot System** — every file edit creates a recoverable snapshot with inline Accept / Reject buttons
-- **12 Tools** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`, `web_search`
+- **13 Tools** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `lsp`, `fetch_url`, `web_search`
 - **Syntax Checking** — tree-sitter based analysis for 14+ languages (TypeScript, Python, Rust, Go, C/C++, Java, Ruby, etc.)
 - **Context Management** — automatic context compression near limits, context window management (up to 256K)
 - **Metrics** — real token usage, prompt cache display, context window utilization
 - **Sessions** — persistent chat history with switching and search
+- **Automatic Provider Selection** - More details in Changelog.
 
 ## Quick Start
 
@@ -52,6 +53,7 @@ src/
 │   ├── toolCalling.ts        # Tool registry and dispatcher
 │   ├── diagnosticsEngine.ts  # Tree-sitter syntax analysis
 │   ├── sseParser.ts          # SSE stream parser
+│   ├── providerAutoSelect.ts # Auto-selection of provider (cache, price, speed)
 │   ├── tools/                # Tool implementations
 │   └── SystemContext/        # Context management
 │

@@ -333,6 +333,8 @@
       let dashboard = document.getElementById('metrics-dashboard');
       if (!dashboard) return;
 
+
+
       const inputK = (metrics.inputTokens / 1000).toFixed(1);
       const outputK = (metrics.outputTokens / 1000).toFixed(1);
       const ctxK = (metrics.currentContextTokens / 1000).toFixed(1);

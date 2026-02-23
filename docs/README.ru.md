@@ -12,14 +12,15 @@
 
 - **Agent-режим** — автономное редактирование кода, создание файлов, запуск терминальных команд, итеративное решение задач через цикл агента
 - **Chat-режим** — AI-ассистент только для чтения с доступом к контексту вашего проекта
-- **8 провайдеров** — Ollama (локально, бесплатно), OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Gemini
+- **Мульти-провайдер** — Ollama (локально, бесплатно), OpenRouter, Mistral, DeepSeek.
 - **Браузер моделей** — поиск и добавление моделей прямо из интерфейса
 - **Snapshot-система** — каждая правка файла создаёт снимок с кнопками Accept / Reject в редакторе
-- **12 инструментов** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`, `web_search`
+- **13 инструментов** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `lsp`, `fetch_url`, `web_search`
 - **Синтаксический анализ** — tree-sitter для 14+ языков (TypeScript, Python, Rust, Go, C/C++, Java, Ruby и др.)
 - **Контекст-менеджмент** — сжатие контекста при приближении к лимиту, управление окном контекста (до 256K)
 - **Метрики** — расход токенов, кэш промптов, использование контекстного окна
 - **Сессии** — история чатов с сохранением, переключением и поиском
+- **Автовыбор Провайдера** - Подробнее в Changelog. 
 
 ## Быстрый старт
 
@@ -55,12 +56,16 @@ src/
 │   ├── diagnosticsEngine.ts  # Tree-sitter синтаксический анализ
 │   ├── sseParser.ts          # Парсер SSE-потока
 │   ├── stringMatcher.ts      # Нечёткий поиск строк для edit_file
+│   ├── providerAutoSelect.ts # Автовыбор провайдера (кэш, цена, скорость)
 │   ├── tools/                # Реализации инструментов
 │   │   ├── readFileTool.ts
 │   │   ├── editFileTool.ts
 │   │   ├── fileManagementTools.ts
 │   │   ├── searchTools.ts
 │   │   ├── terminalTool.ts
+│   │   ├── lspBridgeTool.ts
+│   │   ├── fetchUrlTool.ts
+│   │   ├── webSearchTool.ts
 │   │   └── ...
 │   ├── SystemContext/        # Управление контекстом
 │   │   ├── contextSummarizer.ts  # Сжатие/подготовка сообщений

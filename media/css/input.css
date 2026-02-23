@@ -354,6 +354,7 @@ ease;
       border: none;
       box-shadow: none;
       position: relative;
+      border-radius: 5px;
       overflow: visible;
     }
 
@@ -363,7 +364,7 @@ ease;
 
     /* ── textarea ─── */
     .chat-textarea {
-      width: 100%;
+      width: -webkit-fill-available;
       background: transparent;
       border: none;
       outline: none;

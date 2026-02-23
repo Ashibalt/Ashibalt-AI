@@ -30,13 +30,15 @@ out/**/*.js.map
 RoadMap.md
 BUILD.md
 logs.txt
+log.txt
 ы.txt
-CHANGELOG.md
 .gitignore
 .git/**
 __pycache__/**
 ashlight-metrics-server/**
 package-lock.json
+tasks.md
+docs/**
 
 # Extra READMEs (main README.md is kept)
 README.hy.md

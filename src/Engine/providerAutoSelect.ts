@@ -3,8 +3,8 @@
  *
  * Автовыбор провайдера OpenRouter с поддержкой prompt caching.
  * Перед первым запросом к модели запрашивает список эндпоинтов,
- * выбирает самый дешёвый провайдер с кэшированием и кэширует
- * результат в Map на уровне модуля (до перезапуска расширения).
+ * выбирает оптимального провайдера по критериям: кэш → цена кэша →
+ * цена output → скорость (TPS), и кэширует результат на сессию.
  */
 
 import { logger } from '../logger';
@@ -19,10 +19,18 @@ interface EndpointPricing {
   [key: string]: string | number | undefined;
 }
 
+interface ThroughputPercentiles {
+  p50?: number;
+  p75?: number;
+  p90?: number;
+  p99?: number;
+}
+
 interface OpenRouterEndpoint {
   name: string;
   provider_name: string;
   pricing: EndpointPricing;
+  throughput_last_30m?: ThroughputPercentiles;
   [key: string]: any;
 }
 
@@ -37,6 +45,15 @@ export interface ProviderSelection {
   order: string[];
   allow_fallbacks: boolean;
 }
+
+/**
+ * Допуски для группировки "одинаковых" цен.
+ * Значения в $/токен (API возвращает цены за токен, не за миллион).
+ * $0.03/M = 3e-8 per token  — допуск для cache_read
+ * $0.10/M = 1e-7 per token  — допуск для completion (output)
+ */
+const CACHE_READ_TOLERANCE = 3e-8;   // $0.03 per million tokens
+const COMPLETION_TOLERANCE = 1e-7;   // $0.10 per million tokens
 
 function normalizeProviderRoutingName(name: string): string {
   return String(name || '')
@@ -98,8 +115,17 @@ export function markProviderRateLimited(modelId: string, providerName: string, t
 /**
  * Определяет оптимальный провайдер OpenRouter с поддержкой prompt caching.
  *
- * @returns `{ order: [providerName], allow_fallbacks: false }` — если провайдер выбран (жёсткий выбор)
- *          `null` — если автовыбор отключён (нет кэш-провайдеров или слишком дорого)
+ * Алгоритм выбора (только среди провайдеров с input_cache_read):
+ *   1. Находим минимальную цену cache_read
+ *   2. Формируем группу: все провайдеры с cache_read ≤ min + CACHE_READ_TOLERANCE
+ *   3. Внутри группы находим минимальную цену completion (output)
+ *   4. Формируем финальную группу: completion ≤ min_completion + COMPLETION_TOLERANCE
+ *   5. Из финальной группы выбираем с максимальным throughput_last_30m.p50 (TPS)
+ *
+ * Если провайдеров с кэшем нет → возвращает null (стандартный механизм OpenRouter).
+ *
+ * @returns ProviderSelection — жёсткий выбор провайдера
+ *          null              — автовыбор отключён, OpenRouter выбирает сам
  */
 export async function resolveOpenRouterProvider(
   modelId: string,
@@ -118,8 +144,8 @@ export async function resolveOpenRouterProvider(
       providerCache.delete(modelId);
       logger.log(`[ProviderAutoSelect] Cache STALE for "${modelId}" (selected provider is rate-limited), recomputing...`);
     } else {
-    logger.log(`[ProviderAutoSelect] Cache HIT for "${modelId}" → ${cached ? cached.order[0] : 'null (auto)'}`);
-    return cached;
+      logger.log(`[ProviderAutoSelect] Cache HIT for "${modelId}" → ${cached ? cached.order[0] : 'null (auto)'}`);
+      return cached;
     }
   }
 
@@ -140,7 +166,6 @@ export async function resolveOpenRouterProvider(
 
     if (!response.ok) {
       logger.error(`[ProviderAutoSelect] API error: ${response.status} ${response.statusText}`);
-      // НЕ записываем в кэш — следующий запрос попробует снова
       return null;
     }
 
@@ -149,21 +174,30 @@ export async function resolveOpenRouterProvider(
 
     if (!endpoints || !Array.isArray(endpoints) || endpoints.length === 0) {
       logger.log(`[ProviderAutoSelect] No endpoints found for "${modelId}"`);
-      // Do NOT cache null — empty endpoints may be transient (all providers blacklisted or API hiccup)
       return null;
     }
 
-    // Разделяем на провайдеры с кэшированием и без
-    const withCache: { endpoint: OpenRouterEndpoint; promptPrice: number; cacheReadPrice: number }[] = [];
-    const withoutCache: { endpoint: OpenRouterEndpoint; promptPrice: number }[] = [];
+    // ── Собираем только провайдеры с input_cache_read ──────────────────────
+    interface CacheCandidate {
+      endpoint: OpenRouterEndpoint;
+      cacheReadPrice: number;
+      completionPrice: number;
+      throughput: number;
+    }
+
+    const withCache: CacheCandidate[] = [];
 
     for (const ep of endpoints) {
       const pricing = ep.pricing;
       if (!pricing) continue;
 
-      const promptPrice = parseFloat(pricing.prompt);
       const hasCaching = pricing.input_cache_read !== undefined && pricing.input_cache_read !== null;
-      const cacheReadPrice = hasCaching ? parseFloat(pricing.input_cache_read!) : 0;
+      const cacheReadPrice = hasCaching ? parseFloat(pricing.input_cache_read!) : NaN;
+
+      if (!hasCaching || isNaN(cacheReadPrice)) {
+        logger.log(`[ProviderAutoSelect]   ✗ "${ep.provider_name}" — без кэширования`);
+        continue;
+      }
 
       const routingName = normalizeProviderRoutingName(ep.provider_name) || ep.provider_name;
       if (isProviderRateLimited(modelId, routingName)) {
@@ -171,53 +205,39 @@ export async function resolveOpenRouterProvider(
         continue;
       }
 
-      if (hasCaching && !isNaN(cacheReadPrice)) {
-        withCache.push({ endpoint: ep, promptPrice, cacheReadPrice });
-        logger.log(`[ProviderAutoSelect]   ✓ "${ep.provider_name}" — кэширование: prompt=$${promptPrice}, cache_read=$${cacheReadPrice}`);
-      } else {
-        withoutCache.push({ endpoint: ep, promptPrice });
-        logger.log(`[ProviderAutoSelect]   ✗ "${ep.provider_name}" — без кэширования: prompt=$${promptPrice}`);
-      }
+      const completionPrice = parseFloat(pricing.completion) || 0;
+      const throughput = ep.throughput_last_30m?.p50 ?? 0;
+
+      withCache.push({ endpoint: ep, cacheReadPrice, completionPrice, throughput });
+      logger.log(`[ProviderAutoSelect]   ✓ "${ep.provider_name}" — cache_read=$${cacheReadPrice}, completion=$${completionPrice}, tps=${throughput}`);
     }
 
-    // Нет провайдеров с кэшированием — fallback к самому дешёвому без кэша
+    // ── Нет кэш-провайдеров → null (стандартный механизм OpenRouter) ───────
     if (withCache.length === 0) {
-      if (withoutCache.length > 0) {
-        withoutCache.sort((a, b) => a.promptPrice - b.promptPrice);
-        const bestNoCache = withoutCache[0];
-        const providerName = bestNoCache.endpoint.provider_name;
-        const providerRoutingName = normalizeProviderRoutingName(providerName) || providerName;
-        const selection: ProviderSelection = {
-          order: [providerRoutingName],
-          allow_fallbacks: false
-        };
-        logger.log(`[ProviderAutoSelect] No caching providers for "${modelId}" → selected non-cache "${providerName}" (routing="${providerRoutingName}", fallbacks=false)`);
-        providerCache.set(modelId, selection);
-        return selection;
-      }
-
-      logger.log(`[ProviderAutoSelect] No available providers left for "${modelId}" (all filtered/rate-limited) → null`);
+      logger.log(`[ProviderAutoSelect] No caching providers for "${modelId}" → null (standard OpenRouter routing)`);
       providerCache.set(modelId, null);
       return null;
     }
 
-    // Сортировка: по prompt price ASC, при равенстве — по cache_read ASC
-    withCache.sort((a, b) => {
-      if (a.promptPrice !== b.promptPrice) return a.promptPrice - b.promptPrice;
-      return a.cacheReadPrice - b.cacheReadPrice;
-    });
+    // ── Шаг 1: группируем по cache_read (в пределах CACHE_READ_TOLERANCE) ──
+    const minCacheRead = Math.min(...withCache.map(e => e.cacheReadPrice));
+    const cacheReadGroup = withCache.filter(e => e.cacheReadPrice - minCacheRead <= CACHE_READ_TOLERANCE);
+    logger.log(
+      `[ProviderAutoSelect] cache_read group (min=$${minCacheRead}, tolerance=$${CACHE_READ_TOLERANCE}): ` +
+      cacheReadGroup.map(e => `${e.endpoint.provider_name}($${e.cacheReadPrice})`).join(', ')
+    );
 
-    const best = withCache[0];
+    // ── Шаг 2: группируем по completion (в пределах COMPLETION_TOLERANCE) ──
+    const minCompletion = Math.min(...cacheReadGroup.map(e => e.completionPrice));
+    const completionGroup = cacheReadGroup.filter(e => e.completionPrice - minCompletion <= COMPLETION_TOLERANCE);
+    logger.log(
+      `[ProviderAutoSelect] completion group (min=$${minCompletion}, tolerance=$${COMPLETION_TOLERANCE}): ` +
+      completionGroup.map(e => `${e.endpoint.provider_name}($${e.completionPrice})`).join(', ')
+    );
 
-    // Защитная проверка 3x: если prompt цена кэш-провайдера > 3x мин. цены без кэша
-    if (withoutCache.length > 0) {
-      const minNonCachePrompt = Math.min(...withoutCache.map(e => e.promptPrice));
-      if (best.promptPrice > minNonCachePrompt * 3) {
-        logger.log(`[ProviderAutoSelect] ⚠ 3x guard triggered: cache provider "${best.endpoint.provider_name}" prompt=$${best.promptPrice} > 3× min non-cache=$${minNonCachePrompt} → null`);
-        providerCache.set(modelId, null);
-        return null;
-      }
-    }
+    // ── Шаг 3: из финальной группы — самый быстрый (highest TPS) ───────────
+    completionGroup.sort((a, b) => b.throughput - a.throughput);
+    const best = completionGroup[0];
 
     const providerName = best.endpoint.provider_name;
     const providerRoutingName = normalizeProviderRoutingName(providerName) || providerName;
@@ -227,12 +247,16 @@ export async function resolveOpenRouterProvider(
       allow_fallbacks: false
     };
 
-    logger.log(`[ProviderAutoSelect] ✓ Selected "${providerName}" → routing "${providerRoutingName}" for "${modelId}" (prompt=$${best.promptPrice}, cache_read=$${best.cacheReadPrice}, fallbacks=false)`);
+    logger.log(
+      `[ProviderAutoSelect] ✓ Selected "${providerName}" → routing "${providerRoutingName}" for "${modelId}" ` +
+      `(cache_read=$${best.cacheReadPrice}, completion=$${best.completionPrice}, tps=${best.throughput}, fallbacks=false)`
+    );
     providerCache.set(modelId, selection);
     return selection;
+
   } catch (error: any) {
     logger.error(`[ProviderAutoSelect] Failed to fetch endpoints for "${modelId}":`, error?.message || error);
-    // НЕ записываем в кэш — следующий запрос попробует снова
     return null;
   }
 }
+

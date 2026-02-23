@@ -13,7 +13,9 @@ out/
 
 # Logs
 logs.txt
+log.txt
 logs-session/
+tasks.md
 
 # VS Code test workspace
 .vscode-test/

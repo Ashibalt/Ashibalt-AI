@@ -157,6 +157,9 @@
       const savedEnabled = localStorage.getItem(METRICS_ENABLED_KEY);
       const isEnabled = savedEnabled === null ? true : savedEnabled === 'true'; // default ON
       metricsToggle.checked = isEnabled;
+      if (usageMetricsPanel) {
+        usageMetricsPanel.style.display = isEnabled ? 'block' : 'none';
+      }
       if (isEnabled) {
         loadAndRenderUsageMetrics();
         // Notify extension on init so metricsService starts
@@ -166,6 +169,10 @@
       metricsToggle.addEventListener('change', () => {
         const on = metricsToggle.checked;
         localStorage.setItem(METRICS_ENABLED_KEY, on ? 'true' : 'false');
+        if (usageMetricsPanel) {
+          usageMetricsPanel.style.display = on ? 'block' : 'none';
+        }
+
         if (on) {
           loadAndRenderUsageMetrics();
           const currentMetrics = getLocalMetrics();

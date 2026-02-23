@@ -519,6 +519,7 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       const rawArgs = toolCall.function.arguments || '{}';
       try {
         args = JSON.parse(rawArgs);
+        toolCall.function.arguments = JSON.stringify(args);
       } catch (parseErr) {
         // Multi-stage JSON recovery for common model mistakes
         args = tryRecoverJSON(rawArgs, toolName, response.finish_reason);
@@ -543,8 +544,24 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
           }
           
           logger.log(`[TOOL] Failed to parse args for ${toolName}: ${(parseErr as Error).message}. Raw(200): ${rawArgs.slice(0, 200)}`);
-          args = {};
+          const argsError = `ERROR: Invalid JSON in tool arguments for ${toolName}. ` +
+            `Please call the same tool again with valid JSON (proper quotes, commas, and escaped newlines).`;
+
+          // Keep conversation tool_calls JSON-valid to avoid provider 400 on next iteration
+          toolCall.function.arguments = '{}';
+
+          conversationMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: argsError
+          });
+
+          postMessage({ type: 'toolResult', name: toolName, result: argsError, id: assistantPlaceholderId });
+          continue;
         }
+
+        // Recovery succeeded — persist normalized JSON into conversation history
+        toolCall.function.arguments = JSON.stringify(args);
       }
 
       // Post tool call notification (preface text)

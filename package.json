@@ -2,7 +2,7 @@
   "name": "ashibalt-ai",
   "displayName": "Ashibalt [AI Agent]",
   "description": "AI-агент для написания кода в VS Code. Agent-режим, мульти-провайдер (OpenRouter, Ollama, Mistral, DeepSeek)",
-  "version": "0.1.0",
+  "version": "0.3.1",
   "publisher": "Ashibalt",
   "license": "MIT",
   "icon": "icon_providers/icon_main.png",
@@ -19,6 +19,7 @@
   "keywords": [
     "ai",
     "agent",
+    "ai agent",
     "copilot",
     "coding-assistant",
     "openrouter",

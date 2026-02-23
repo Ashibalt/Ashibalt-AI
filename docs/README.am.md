@@ -12,14 +12,15 @@
 
 - **Գործակալի ռեժիմ** — կոդի ինքնավար խմբագրում, ֆայլերի ստեղծում, տերմինալային հրամաններ, կրկնողական խնդիրների լուծում
 - **Չաթի ռեժիմ** — կարդալ-միայն AI օգնական՝ ձեր կոդային բազայի համատեքստով
-- **8 մատակարար** — Ollama (տեղական, անվճար), OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Gemini
+- **Մատակարարներ** — Ollama (տեղական, անվճար), OpenRouter, Mistral, DeepSeek.
 - **Մոդելների դիտարկիչ** — մոդելների որոնում և ավելացում անմիջապես UI-ից
 - **Snapshot համակարգ** — ֆայլի յուրաքանչյուր խմբագրում ստեղծում է վերականգնելի snapshot՝ ներկառուցված Accept / Reject կոճակներով
-- **12 գործիք** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `fetch_url`, `web_search`
+- **13 գоրծիքներ** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `write_to_terminal`, `read_terminal_output`, `diagnose`, `lsp`, `fetch_url`, `web_search`
 - **Շարահյուսության ստուգում** — tree-sitter հիմքով վերլուծություն 14+ լեզուների համար (TypeScript, Python, Rust, Go, C/C++, Java, Ruby և այլն)
 - **Համատեքստի կառավարում** — ավտոմատ սեղմում սահմանների մոտ, համատեքստի պատուհանի կառավարում (մինչև 256K)
 - **Չափումներ** — իրական token-ների օգտագործում, prompt cache ցուցադրում, համատեքստի պատուհանի օգտագործում
 - **Նիստեր** — կայուն չաթի պատմություն՝ անցման և որոնման հնարավորությամբ
+- **Մատակարարի ավտոմատ ընտրություն** - Ավելի մանրամասն՝ փոփոխությունների գրանցամատյանում։
 
 ## Արագ մեկնարկ
 
@@ -52,6 +53,7 @@ src/
 │   ├── toolCalling.ts        # Գործիքների ռեեստր և dispatcher
 │   ├── diagnosticsEngine.ts  # Tree-sitter շարահյուսության վերլուծություն
 │   ├── sseParser.ts          # SSE հոսքի վերլուծիչ
+│   ├── providerAutoSelect.ts # Provider auto-select (cache, price, speed)
 │   ├── tools/                # Գործիքների իրականացումներ
 │   └── SystemContext/        # Համատեքստի կառավարում
 │

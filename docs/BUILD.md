@@ -47,13 +47,12 @@ npm run watch
 
 ## Available Scripts
 
-| Command              | Description                       |
-| -------------------- | --------------------------------- |
-| `npm run compile`    | One-shot TypeScript compilation   |
-| `npm run watch`      | Watch mode — recompile on save    |
-| `npm run lint`       | Run ESLint                        |
-| `npm test`           | Run tests (Vitest)                |
-| `npm run package`    | Build `.vsix` package             |
+| Command              | Description                          |
+| -------------------- | ------------------------------------ |
+| `npm run compile`    | One-shot TypeScript compilation      |
+| `npm run watch`      | Watch mode — recompile on save       |
+| `npm test`           | Run tests (Vitest)                   |
+| `npx @vscode/vsce package` | Build `.vsix` package        |
 
 ## Building a VSIX Package
 
@@ -80,8 +79,6 @@ src/
 ├── promptUtils.ts            # System prompts (Agent, Chat)
 ├── chatClientFactory.ts      # HTTP client factory for providers
 ├── constants.ts              # Shared constants (ignore lists)
-├── logger.ts                 # Logging
-├── iconMap.ts                # File icons
 │
 ├── Config/                   # Configuration
 │   ├── config.ts             # VS Code settings loader
@@ -95,38 +92,20 @@ src/
 │   ├── toolCalling.ts        # Tool registry and dispatcher
 │   ├── diagnosticsEngine.ts  # Tree-sitter syntax analysis
 │   ├── sseParser.ts          # SSE stream parser
-│   ├── stringMatcher.ts      # Fuzzy string matching for edit_file
+│   ├── providerAutoSelect.ts # Auto-selection of provider (cache, price, speed)
 │   ├── tools/                # Tool implementations
-│   │   ├── readFileTool.ts
-│   │   ├── editFileTool.ts
-│   │   ├── fileManagementTools.ts
-│   │   ├── searchTools.ts
-│   │   ├── terminalTool.ts
-│   │   ├── fetchUrlTool.ts
-│   │   ├── diagnoseTool.ts
-│   │   └── toolUtils.ts
-│   ├── SystemContext/        # Context management
-│   │   ├── contextSummarizer.ts
-│   │   ├── contextCache.ts
-│   │   ├── contextHelpers.ts
-│   │   ├── memoryManager.ts
-│   │   └── fileSkeletonExtractor.ts
-│   └── OpenRouter/
-│       └── openRouterClient.ts
+│   └── SystemContext/        # Context management
 │
 ├── WebView/                  # Chat UI
-│   ├── ChatViewProvider.ts   # Main webview provider
-│   ├── script.js             # Client-side JS
+│   ├── ChatViewProvider.ts   # Main webview provider (extension host)
+│   ├── script.js             # Client-side JS (UI logic)
 │   ├── style.css             # Styles
-│   ├── chatView.html         # HTML template
-│   ├── chatViewHtml.ts       # HTML generation
-│   └── snapshotHandler.ts    # Snapshot handling in webview
+│   └── chatViewHtml.ts       # HTML generation
 │
 ├── Storage/                  # Data persistence
 │   ├── storageManager.ts     # Sessions, messages, metrics
 │   ├── snapshotManager.ts    # File snapshots
-│   ├── snapshotDecorations.ts # Editor decorations
-│   └── uidManager.ts         # Anonymous usage ID
+│   └── snapshotDecorations.ts # Editor decorations
 │
 ├── Commands/
 │   └── slashCommands.ts      # Slash commands (/fix, /project_analysis, etc.)
