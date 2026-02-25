@@ -1,0 +1,117 @@
+# Ashibalt AI
+
+> **Beta** — actively developed. Feedback is welcome!
+
+---
+
+## What is it
+
+**Ashibalt AI** is a full-featured AI coding agent for Visual Studio Code. It doesn't just answer questions — it can autonomously edit files, run terminal commands, search your project, diagnose errors, and iteratively solve complex tasks.
+
+## Features
+
+- **Agent Mode** — autonomous code editing, file creation, terminal commands, iterative problem solving via agent loop
+- **Chat Mode** — read-only AI assistant with your codebase context
+- **Multi-Provider** — Ollama (local, free), OpenRouter, Mistral, DeepSeek.
+- **Model Browser** — search and add models directly from the UI
+- **Snapshot System** — every file edit creates a recoverable snapshot with inline Accept / Reject buttons
+- **17 Tools** — `read_file`, `edit_file`, `create_file`, `delete_file`, `list_files`, `search`, `terminal`, `xray_codebase`, `tasks`, `diagnose`, `lsp`, `fetch_url`, `web_search`, `ask_user`, `add_commit`, `get_commit`, `product_check`
+- **Autonomous Terminal** — the agent runs commands in a dedicated terminal with automatic output capture, interactive prompt detection (y/n, password, selection), and user confirmation UI
+- **Semantic Project Analysis[LSP]** — `xray_codebase` tool provides a structural overview of any codebase: file tree with function/class signatures, constants, variables, and line numbers — supporting Python, TypeScript, JavaScript, Go and more
+- **Task Tracking** — `tasks` tool lets the agent create and manage a structured task list displayed in the chat UI with auto-clear on new requests
+- **Clarifying Questions** — `ask_user` tool lets the agent ask the user a question with preset options inline in the chat bubble, pausing the agent loop until the user responds
+- **Commits (Backups)** — `add_commit` / `get_commit`: a git-commit analog that works without git. The agent creates full file backups with a name and a scope path, and can restore, delete, or diff snapshots against the current workspace
+- **Page QA Checks** — `product_check`: launches a headless browser and runs comprehensive automated checks on any web page — viewport overflow, element overlaps, broken images, dead buttons, clipped text, accessibility issues, JS console errors, and network failures. All output is plain text; no screenshots or vision model required
+- **Syntax Checking** — tree-sitter based analysis for 14+ languages (TypeScript, Python, Rust, Go, C/C++, Java, Ruby, etc.)
+- **Context Management** — automatic context compression near limits, context window management (up to 256K)
+- **Metrics** — real token usage, prompt cache display, context window utilization
+- **Sessions** — persistent chat history with switching and search
+- **Automatic Provider Selection** - More details in Changelog.
+
+## Quick Start
+
+1. Install the extension from VS Code Marketplace
+2. Open the Ashibalt sidebar (icon in the Activity Bar)
+3. Open ⚙️ Settings, choose a provider and enter your API key:
+   - **Ollama** — install [Ollama](https://ollama.com), run a model locally (free)
+   - **OpenRouter** — get an API key at [openrouter.ai](https://openrouter.ai)
+   - **Mistral / DeepSeek** — enter API key
+4. Pick a model and start coding!
+
+## Project Structure
+
+```
+src/
+├── extension.ts              # Extension entry point
+├── promptUtils.ts            # System prompts (Agent, Chat)
+├── chatClientFactory.ts      # HTTP client factory for providers
+├── constants.ts              # Shared constants (ignore lists)
+│
+├── Config/                   # Configuration
+│   ├── config.ts             # VS Code settings loader
+│   └── configManager.ts      # Model list management
+│
+├── Engine/                   # AI Agent core
+│   ├── agentLoop.ts          # Main agent loop (tool calling)
+│   ├── agentErrors.ts        # API error parsing, JSON recovery
+│   ├── fetchWithTools.ts     # HTTP requests to chat/completions
+│   ├── modelParams.ts        # Centralized model parameters (temp, top_p, max_tokens)
+│   ├── toolCalling.ts        # Tool registry and dispatcher
+│   ├── diagnosticsEngine.ts  # Tree-sitter syntax analysis
+│   ├── sseParser.ts          # SSE stream parser
+│   ├── providerAutoSelect.ts # Auto-selection of provider (cache, price, speed)
+│   ├── tools/                # Tool implementations
+│   │   ├── readFileTool.ts
+│   │   ├── editFileTool.ts
+│   │   ├── fileManagementTools.ts
+│   │   ├── searchTools.ts
+│   │   ├── terminalTool.ts         # Autonomous terminal (run, write_stdin, read output)
+│   │   ├── xrayCodebaseTool.ts     # Semantic project analysis
+│   │   ├── tasksTool.ts            # Task tracking
+│   │   ├── commitTool.ts           # add_commit / get_commit (backups)
+│   │   ├── productCheckTool.ts     # product_check (headless QA audit)
+│   │   ├── lspBridgeTool.ts
+│   │   ├── diagnoseTool.ts
+│   │   ├── fetchUrlTool.ts
+│   │   ├── webSearchTool.ts
+│   │   └── toolUtils.ts
+│   └── SystemContext/        # Context management
+│
+├── WebView/                  # Chat UI
+│   ├── ChatViewProvider.ts   # Main webview provider (extension host)
+│   ├── script.js             # Client-side JS (UI logic)
+│   ├── style.css             # Styles
+│   └── chatViewHtml.ts       # HTML generation
+│
+├── Storage/                  # Data persistence
+│   ├── storageManager.ts     # Sessions, messages, metrics
+│   ├── snapshotManager.ts    # File snapshots
+│   ├── commitManager.ts      # Git analog: backups, restore, diff
+│   └── snapshotDecorations.ts # Editor decorations
+│
+├── Commands/
+│   └── slashCommands.ts      # Slash commands (/fix, /project_analysis, etc.)
+│
+└── Services/
+    └── metricsService.ts     # Usage metrics service
+```
+
+## Web Search
+
+The `web_search` tool uses [Tavily API](https://tavily.com). To enable it:
+1. Sign up at [tavily.com](https://tavily.com) and get a free API key
+2. Paste the key into `src/Engine/tools/webSearchTool.ts` in the `apiKey` variable
+
+## Privacy
+
+- API keys are stored locally in VS Code's secure secret storage
+- Data is only transmitted between your machine and the chosen AI provider
+
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Links
+
+- [Support](https://dalink.to/ashibalt)
