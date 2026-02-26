@@ -40,6 +40,9 @@
         case 'tasksUpdate':
           renderTasksPanel(message.tasks);
           break;
+        case 'balanceUpdate':
+          updateBalanceDisplay(message.balance);
+          break;
         case 'terminalInteractivePrompt':
           showTerminalInteractivePrompt(message.output, message.prompt, message.id, message.suggestion || '');
           break;
@@ -257,6 +260,16 @@
             if (toggle) toggle.checked = message.autoRunTerminal;
             const warning = document.getElementById('auto-run-warning');
             if (warning) warning.style.display = message.autoRunTerminal ? '' : 'none';
+          }
+          // Restore metrics toggle from VS Code config (overrides localStorage default)
+          if (message.metricsEnabled !== undefined) {
+            const metricsToggleEl = document.getElementById('metrics-toggle');
+            if (metricsToggleEl) {
+              metricsToggleEl.checked = message.metricsEnabled;
+              localStorage.setItem('ashibalt_metrics_enabled', message.metricsEnabled ? 'true' : 'false');
+              const panel = document.getElementById('usage-metrics-panel');
+              if (panel) panel.style.display = message.metricsEnabled ? 'block' : 'none';
+            }
           }
           break;
         case 'slashCommands':

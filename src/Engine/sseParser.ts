@@ -20,6 +20,7 @@ export interface SSEUsageInfo {
   completion_tokens?: number;
   total_tokens?: number;
   cached_tokens?: number;
+  cost?: number;
 }
 
 export interface SSEParseResult {
@@ -115,6 +116,8 @@ export async function parseSSEStream(
                 ?? json.usage.prompt_cache_hit_tokens
                 ?? json.usage.cache_read_input_tokens
                 ?? undefined,
+              // OpenRouter returns cost in the final SSE chunk
+              cost: json.usage.cost ?? undefined,
             };
           }
 

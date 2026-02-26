@@ -42,7 +42,10 @@ interface EndpointsResponse {
 }
 
 export interface ProviderSelection {
-  order: string[];
+  /** List of providers to allow (OpenRouter picks best among them, sticky routing preserved). */
+  only?: string[];
+  /** Legacy: force strict order. Deprecated — breaks sticky routing. */
+  order?: string[];
   allow_fallbacks: boolean;
 }
 
@@ -91,9 +94,16 @@ export function initProviderCacheStorage(storage: CacheMemento): void {
     = storage.get(STORAGE_KEY, undefined as any);
   if (persisted && typeof persisted === 'object') {
     let loaded = 0;
+    let skippedLegacy = 0;
     for (const [key, entry] of Object.entries(persisted)) {
       if (entry && typeof entry === 'object' && typeof entry.savedAt === 'number') {
         if (Date.now() - entry.savedAt < CACHE_MAX_AGE_MS) {
+          // Skip legacy single-provider entries — they break sticky routing
+          const sel = entry.selection;
+          if (sel && !sel.only && sel.order && sel.allow_fallbacks === false) {
+            skippedLegacy++;
+            continue;
+          }
           providerCache.set(key, entry.selection);
           loaded++;
         }
@@ -101,6 +111,10 @@ export function initProviderCacheStorage(storage: CacheMemento): void {
     }
     if (loaded > 0) {
       logger.log(`[ProviderAutoSelect] Restored ${loaded} cached provider selections from storage`);
+    }
+    if (skippedLegacy > 0) {
+      logger.log(`[ProviderAutoSelect] Skipped ${skippedLegacy} legacy format entries (will recompute)`);
+      persistCache(); // Remove legacy entries from storage
     }
   }
 }
@@ -149,7 +163,8 @@ export function markProviderRateLimited(modelId: string, providerName: string, t
   providerRateLimitUntil.set(key, until);
 
   const cached = providerCache.get(modelId);
-  if (cached?.order?.some(p => normalizeProviderRoutingName(p) === normalized)) {
+  const cachedList = cached?.only ?? cached?.order ?? [];
+  if (cachedList.some(p => normalizeProviderRoutingName(p) === normalized)) {
     providerCache.delete(modelId);
     persistCache();
     logger.log(`[ProviderAutoSelect] Dropped cache for "${modelId}" because provider "${normalized}" is rate-limited`);
@@ -188,11 +203,16 @@ export async function resolveOpenRouterProvider(
   // Cache hit
   if (providerCache.has(modelId)) {
     const cached = providerCache.get(modelId)!;
-    if (cached?.order?.some(p => isProviderRateLimited(modelId, p))) {
+    // Invalidate legacy format: {order:[one], allow_fallbacks:false} — breaks sticky routing
+    if (cached && !cached.only && cached.order && cached.allow_fallbacks === false) {
+      providerCache.delete(modelId);
+      persistCache();
+      logger.log(`[ProviderAutoSelect] Cache LEGACY for "${modelId}" (old single-provider format) — cleared, recomputing...`);
+    } else if (cached?.only?.some(p => isProviderRateLimited(modelId, p)) || cached?.order?.some(p => isProviderRateLimited(modelId, p))) {
       providerCache.delete(modelId);
       logger.log(`[ProviderAutoSelect] Cache STALE for "${modelId}" (selected provider is rate-limited), recomputing...`);
     } else {
-      logger.log(`[ProviderAutoSelect] Cache HIT for "${modelId}" → ${cached ? cached.order[0] : 'null (auto)'}`);
+      logger.log(`[ProviderAutoSelect] Cache HIT for "${modelId}" → ${cached ? (cached.only ?? cached.order ?? []).join(', ') : 'null (auto)'}`);
       return cached;
     }
   }
@@ -284,21 +304,24 @@ export async function resolveOpenRouterProvider(
       completionGroup.map(e => `${e.endpoint.provider_name}($${e.completionPrice})`).join(', ')
     );
 
-    // ── Шаг 3: из финальной группы — самый быстрый (highest TPS) ───────────
+    // ── Шаг 3: собираем ВСЕ провайдеры из финальной группы → only-list ──────
+    // Передаём список в `only` вместо `order`, чтобы OpenRouter сохранял
+    // sticky routing и сам выбирал лучший endpoint среди кеш-провайдеров.
+    // С `order` и `allow_fallbacks:false` sticky routing отключается.
     completionGroup.sort((a, b) => b.throughput - a.throughput);
-    const best = completionGroup[0];
 
-    const providerName = best.endpoint.provider_name;
-    const providerRoutingName = normalizeProviderRoutingName(providerName) || providerName;
+    const onlyList = completionGroup.map(
+      e => normalizeProviderRoutingName(e.endpoint.provider_name) || e.endpoint.provider_name
+    );
 
     const selection: ProviderSelection = {
-      order: [providerRoutingName],
-      allow_fallbacks: false
+      only: onlyList,
+      allow_fallbacks: true
     };
 
     logger.log(
-      `[ProviderAutoSelect] ✓ Selected "${providerName}" → routing "${providerRoutingName}" for "${modelId}" ` +
-      `(cache_read=$${best.cacheReadPrice}, completion=$${best.completionPrice}, tps=${best.throughput}, fallbacks=false)`
+      `[ProviderAutoSelect] ✓ Cache providers for "${modelId}": [${onlyList.join(', ')}] ` +
+      `(allow_fallbacks=true, sticky routing preserved by OpenRouter)`
     );
     providerCache.set(modelId, selection);
     persistCache();

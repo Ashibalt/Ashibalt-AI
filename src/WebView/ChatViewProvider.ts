@@ -254,12 +254,14 @@ export class ChatViewProvider implements WebviewViewProvider {
             const ollamaBaseUrl = cfg.get<string>("ollamaBaseUrl", "http://localhost:11434");
             const agentIterations = cfg.get<number>("agentIterations", 25);
             const autoRunTerminal = cfg.get<boolean>("autoRunTerminal", false);
+            const metricsEnabled = cfg.get<boolean>("metricsEnabled", false);
             this.postMessage({
               type: 'restoreSettings',
               providerSettings,
               ollamaBaseUrl,
               agentIterations,
-              autoRunTerminal
+              autoRunTerminal,
+              metricsEnabled
             });
           }
           // Wait for history/sessions to be loaded from disk before restoring.

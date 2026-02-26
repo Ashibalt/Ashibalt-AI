@@ -23,8 +23,6 @@ import { logger } from '../../logger';
 // Конфигурация
 const MAX_MESSAGE_PAIRS = 15;  // 15 пар = 30 сообщений (user + assistant) — more memory for model
 const MAX_TOOL_RESULT_LENGTH = 800;  // Increased: model was forgetting file contents with 300
-const DEFAULT_MAX_CONTEXT_TOKENS = 50000;  // Default for models without known context window
-const DEFAULT_AGGRESSIVE_THRESHOLD = 45000;  // Default pre-emptive compression threshold
 
 export interface Message {
   role: 'system' | 'user' | 'assistant' | 'tool';

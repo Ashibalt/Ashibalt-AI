@@ -281,6 +281,14 @@ function runPageAudit(options = {}) {
       const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length;
       if (avgHeight < 20) continue; // too small to matter
 
+      // Skip flex-column containers where any child has flex-grow > 0.
+      // Pattern: header(fixed) + main(flex:1) + footer(fixed) is intentional, not a bug.
+      const containerStyle = getComputedStyle(container);
+      if (containerStyle.flexDirection === 'column' || containerStyle.flexDirection === 'column-reverse') {
+        const anyFlexGrow = children.some((ch) => parseFloat(getComputedStyle(ch).flexGrow) > 0);
+        if (anyFlexGrow) continue;
+      }
+
       const maxDev = Math.max(...heights.map((h) => Math.abs(h - avgHeight)));
       const devPct = Math.round((maxDev / avgHeight) * 100);
 
@@ -480,6 +488,72 @@ function runPageAudit(options = {}) {
             detail: `Text is clipped by overflow:hidden without text-overflow:ellipsis. Content: "${text.slice(0, 50)}…". Element: ${Math.round(rect.width)}×${Math.round(rect.height)}px, content: ${el.scrollWidth}×${el.scrollHeight}px.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Check 8: Duplicate IDs ───────────────────────────────────────────────
+  // Duplicate IDs break getElementById(), CSS selectors, and ARIA label references.
+  {
+    const idMap = {};
+    const allWithId = document.querySelectorAll('[id]');
+    for (const el of allWithId) {
+      const id = el.id;
+      if (!id) continue;
+      if (!idMap[id]) idMap[id] = 0;
+      idMap[id]++;
+    }
+    for (const [id, count] of Object.entries(idMap)) {
+      if (count > 1) {
+        issues.push({
+          type: 'duplicate_id',
+          severity: 'high',
+          element: `#${id}`,
+          detail: `ID "${id}" appears on ${count} elements. Duplicate IDs break document.getElementById(), CSS selectors, and ARIA label references.`,
+        });
+      }
+    }
+  }
+
+  // ── Check 9: Fixed/Sticky elements outside viewport ─────────────────────
+  // Fixed elements that are offscreen are invisible but still consume memory and
+  // may indicate a transform/animation bug.
+  {
+    const allEls = document.querySelectorAll('*');
+    for (const el of allEls) {
+      if (!isVisible(el)) continue;
+      const pos = getComputedStyle(el).position;
+      if (pos !== 'fixed' && pos !== 'sticky') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 10 || rect.height < 10) continue;
+      // Fully outside viewport bounds
+      if (rect.right < 0 || rect.bottom < 0 || rect.left > viewportW || rect.top > viewportH) {
+        issues.push({
+          type: 'fixed_out_of_viewport',
+          severity: 'medium',
+          element: describeEl(el),
+          detail: `${pos.charAt(0).toUpperCase() + pos.slice(1)}-positioned element is fully outside viewport (left:${Math.round(rect.left)}, top:${Math.round(rect.top)}, right:${Math.round(rect.right)}, bottom:${Math.round(rect.bottom)}). May be an unintentional layout or animation bug.`,
+        });
+      }
+    }
+  }
+
+  // ── Check 10: Empty anchor links ─────────────────────────────────────────
+  // Links with no accessible name are announced as bare "link" by screen readers.
+  if (checkAccessibility) {
+    const anchors = document.querySelectorAll('a[href]');
+    for (const a of anchors) {
+      if (!isVisible(a)) continue;
+      const text = (a.textContent || '').trim();
+      const ariaLabel = a.getAttribute('aria-label') || a.getAttribute('aria-labelledby') || a.getAttribute('title');
+      const hasImg = a.querySelector('img, svg');
+      if (!text && !ariaLabel && !hasImg) {
+        issues.push({
+          type: 'empty_link',
+          severity: 'medium',
+          element: describeEl(a),
+          detail: `Link (href="${(a.getAttribute('href') || '').slice(0, 60)}") has no visible text, no aria-label, and no image. Screen readers will announce it as "link" with no description.`,
+        });
       }
     }
   }

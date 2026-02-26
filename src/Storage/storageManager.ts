@@ -291,7 +291,7 @@ export class StorageManager {
 
   // ---- Session metrics persistence ----
 
-  async saveSessionMetrics(sessionId: string, metrics: { inputTokens: number; outputTokens: number; apiCalls: number; currentContextTokens?: number; contextLimit?: number }) {
+  async saveSessionMetrics(sessionId: string, metrics: { inputTokens: number; outputTokens: number; apiCalls: number; currentContextTokens?: number; contextLimit?: number; modelCosts?: Record<string, number> }) {
     sessionId = sanitizeSessionId(sessionId);
     const dir = path.join(this.sessionsDir, sessionId);
     await fs.mkdir(dir, { recursive: true });
@@ -300,14 +300,14 @@ export class StorageManager {
     logger.log(`[STORAGE] saveSessionMetrics session=${sessionId} apiCalls=${metrics.apiCalls} in=${metrics.inputTokens} out=${metrics.outputTokens} ctx=${metrics.currentContextTokens || 0}/${metrics.contextLimit || 0}`);
   }
 
-  async loadSessionMetrics(sessionId: string): Promise<{ inputTokens: number; outputTokens: number; apiCalls: number; currentContextTokens?: number; contextLimit?: number }> {
+  async loadSessionMetrics(sessionId: string): Promise<{ inputTokens: number; outputTokens: number; apiCalls: number; currentContextTokens?: number; contextLimit?: number; modelCosts?: Record<string, number> }> {
     sessionId = sanitizeSessionId(sessionId);
     const metricsPath = path.join(this.sessionsDir, sessionId, 'metrics.json');
     try {
       const raw = await fs.readFile(metricsPath, 'utf8');
       return JSON.parse(raw);
     } catch {
-      return { inputTokens: 0, outputTokens: 0, apiCalls: 0, currentContextTokens: 0 };
+      return { inputTokens: 0, outputTokens: 0, apiCalls: 0, currentContextTokens: 0, modelCosts: {} };
     }
   }
 

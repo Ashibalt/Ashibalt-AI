@@ -19,6 +19,7 @@ export interface ChatResponse {
     completion_tokens?: number;
     total_tokens?: number;
     cached_tokens?: number;
+    cost?: number;
   };
 }
 
@@ -38,7 +39,7 @@ export async function fetchOpenRouterWithTools(opts: {
   onChunk: (chunk: string) => void;
   onReasoning?: (reasoning: string) => void;
   /** OpenRouter provider routing (from providerAutoSelect) */
-  provider?: { order: string[]; allow_fallbacks: boolean } | null;
+  provider?: { only?: string[]; order?: string[]; allow_fallbacks: boolean } | null;
   /** Explicitly enable parallel tool calls (agent mode) */
   parallelToolCalls?: boolean;
 }): Promise<ChatResponse> {
@@ -77,6 +78,31 @@ export async function fetchOpenRouterWithTools(opts: {
   if (providerRouting && isOpenRouter) {
     body.provider = providerRouting;
     logger.log(`[FETCH] Provider routing: ${JSON.stringify(providerRouting)}`);
+  }
+
+  // Apply explicit cache_control breakpoint to system message for providers that require it.
+  // Anthropic Claude: REQUIRES cache_control to activate prompt caching (no explicit marker = no cache).
+  // Google Gemini: supports cache_control, uses the LAST breakpoint in the request.
+  // OpenAI / DeepSeek / Grok / Moonshot / Groq: implicit caching — no markup needed (would be ignored anyway).
+  // TTL 1h (instead of default 5min) because agent sessions often exceed 5 minutes.
+  if (isOpenRouter && (/claude/i.test(actualModel) || /gemini/i.test(actualModel))) {
+    const sysMsg = body.messages[0];
+    if (sysMsg?.role === 'system' && typeof sysMsg.content === 'string' && sysMsg.content.length > 0) {
+      // Clone the messages array (shallow) to avoid mutating the original conversationMessages —
+      // mutating it would change the byte-identical prefix that providers use for cache lookup.
+      body.messages = [
+        {
+          role: 'system',
+          content: [{
+            type: 'text',
+            text: sysMsg.content,
+            cache_control: { type: 'ephemeral', ttl: '1h' }
+          }]
+        },
+        ...body.messages.slice(1)
+      ];
+      logger.log(`[FETCH] cache_control (ephemeral, ttl=1h) applied to system message for ${actualModel}`);
+    }
   }
 
   if (tools && tools.length > 0) {

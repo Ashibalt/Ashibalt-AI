@@ -24,7 +24,7 @@
 - **Page QA Checks** — `product_check`: launches a headless browser and runs comprehensive automated checks on any web page — viewport overflow, element overlaps, broken images, dead buttons, clipped text, accessibility issues, JS console errors, and network failures. All output is plain text; no screenshots or vision model required
 - **Syntax Checking** — tree-sitter based analysis for 14+ languages (TypeScript, Python, Rust, Go, C/C++, Java, Ruby, etc.)
 - **Context Management** — automatic context compression near limits, context window management (up to 256K)
-- **Metrics** — real token usage, prompt cache display, context window utilization
+- **Metrics** — real token usage per iteration, prompt cache hits, context window utilization, **per-model cost tracking** (`grok-4.1-fast: $0.000093`), and **OpenRouter balance** (`Balance: $1.03`) updated after each agent turn
 - **Sessions** — persistent chat history with switching and search
 - **Automatic Provider Selection** - More details in Changelog.
 

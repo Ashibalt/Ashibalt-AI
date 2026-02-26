@@ -227,7 +227,7 @@ ${wsInfo}
 22. After completing ALL user-requested changes, run a build verification command in terminal (e.g. "npx tsc --noEmit 2>&1" for TypeScript projects) to catch any type errors diagnose() might miss. Fix all errors before declaring done.
 23. Use the correct terminal syntax for the shell specified in <shell>. For bash: use &&, $(), forward slashes. For cmd: use &, %VAR%, backslashes. For PowerShell: use ;, $VAR, -Command.
 24. Use lsp(operation="references") BEFORE renaming or refactoring a symbol to find all usages across the project. Use lsp(operation="definitions") to navigate to source definitions instead of guessing file locations.
-25. When building UI/frontend features, use product_check(url="...") to verify the result looks correct. It detects layout bugs, broken images, overlaps, viewport overflow, and accessibility issues — all without screenshots.
+25. When building UI/frontend features, use product_check(url="...") to verify the result looks correct. It detects layout bugs, broken images, overlaps, viewport overflow, and accessibility issues — all without screenshots. IMPORTANT: before calling product_check on a localhost URL, you MUST first start the dev server via terminal (e.g. "npm run dev", "npx vite", etc.) and confirm it is listening. product_check will auto-open the URL in the user's default browser, but it still needs a running server to get a valid response.
 26. When tasks are set, mark completed steps by appending <tasks>{"done":[0,1]}</tasks> at the END of your text response — do NOT call tasks() for this. Example: "Done!\n<tasks>{\"done\":[0]}</tasks>". This saves tokens — the tag is stripped before entering context.
 </RULES>
 

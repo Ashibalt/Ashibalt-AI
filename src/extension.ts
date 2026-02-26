@@ -130,6 +130,28 @@ export async function activate(context: ExtensionContext) {
     });
 
     logger.log("Extension activated successfully.");
+
+    // First-run anonymous metrics consent — show once, store answer in globalState
+    const metricsConsentShown = context.globalState.get<boolean>('metricsConsentShown', false);
+    if (!metricsConsentShown) {
+      context.globalState.update('metricsConsentShown', true);
+      // Small delay so UI is fully ready before showing the notification
+      setTimeout(async () => {
+        const choice = await window.showInformationMessage(
+          'Help improve Ashibalt AI? Anonymous usage statistics (which tools/models are used — no code, no text, no keys) are sent to help prioritize development. Disable anytime in Settings.',
+          'Enable',
+          'No thanks'
+        );
+        if (choice === 'Enable') {
+          // Persist to VS Code config so the webview toggle reflects the choice on next open
+          await workspace.getConfiguration('ashibaltAi').update('metricsEnabled', true, true);
+          metricsService.enable({ totalRequests: 0, inputTokens: 0, outputTokens: 0, toolUsage: {}, modelUsage: {} });
+          logger.log('[METRICS] User opted in via first-run prompt');
+        } else {
+          logger.log('[METRICS] User declined via first-run prompt');
+        }
+      }, 2000);
+    }
   } catch (error) {
     logger.error("Failed to activate extension:", error);
     window.showErrorMessage("Extension failed to activate. Check Output panel for details.");

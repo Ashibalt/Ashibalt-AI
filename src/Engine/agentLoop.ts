@@ -104,6 +104,60 @@ interface AgentLoopOptions {
 }
 
 /**
+ * Builds a compact summary of dropped conversation groups for the recovery message.
+ * Inserted into conversation after drop-compression so the model remembers what
+ * was already done without needing to re-read files or re-run commands.
+ */
+function buildDroppedGroupsSummary(
+  droppedGroups: Array<{ start: number; end: number; tokens: number; summary: string }>,
+  messages: any[],
+  savedTokens: number
+): string {
+  const lines: string[] = [];
+  for (const grp of droppedGroups) {
+    const assistantMsg = messages[grp.start];
+    if (!assistantMsg?.tool_calls) continue;
+    // Map tool_call_id → result content
+    const resultMap = new Map<string, string>();
+    for (let mi = grp.start + 1; mi < grp.end; mi++) {
+      const m = messages[mi];
+      if (m.role === 'tool' && m.tool_call_id) {
+        resultMap.set(m.tool_call_id, m.content || '');
+      }
+    }
+    for (const tc of assistantMsg.tool_calls) {
+      const name: string = tc.function?.name || '?';
+      let args: any = {};
+      try { args = JSON.parse(tc.function?.arguments || '{}'); } catch {}
+      const result = resultMap.get(tc.id) || '';
+      const failed = result.startsWith('ERROR') || /^\{"error"/.test(result);
+      let line = `• ${name}`;
+      if (args.file_path) {
+        const fname = String(args.file_path).split(/[\\/]/).pop() || args.file_path;
+        line += args.start_line
+          ? `: ${fname} L${args.start_line}${args.end_line ? '-' + args.end_line : ''}`
+          : `: ${fname}`;
+      } else if (args.command) {
+        line += `: ${String(args.command).slice(0, 60)}`;
+        const exitMatch = result.match(/"exit_code"\s*:\s*(\d+)/);
+        if (exitMatch) line += ` → exit ${exitMatch[1]}`;
+      } else if (args.query) {
+        line += `: "${String(args.query).slice(0, 50)}"`;
+      }
+      line += failed ? ' ✗' : ' ✓';
+      lines.push(line);
+    }
+  }
+  const n = droppedGroups.length;
+  return [
+    `[CONTEXT RECOVERY — ${n} iteration group${n !== 1 ? 's' : ''} removed (~${savedTokens} tokens saved).`,
+    `Already completed — do NOT repeat unless specifically needed:`,
+    ...lines,
+    `]`
+  ].join('\n');
+}
+
+/**
  * Runs OpenRouter agent loop with tool calling.
  * Returns true if handled, false otherwise.
  */
@@ -226,6 +280,8 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
   let sessionApiCalls = savedMetrics.apiCalls;
   let sessionCachedTokens = (savedMetrics as any).cachedTokens || 0;
   let currentModelHasCache = false; // tracks if the CURRENT model returns cache data
+  // Per-model cost accumulator — each model keeps its own running total for the session
+  let sessionModelCosts: Record<string, number> = (savedMetrics as any).modelCosts || {};
   // Single source of truth for current context size.
   // Updated ONLY from API prompt_tokens (most accurate).
   // Used for all UI metrics to prevent saw-tooth display pattern.
@@ -374,7 +430,7 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       const is404 = rawMsg.includes('(404)') || summary.includes('404') ||
         rawMsg.toLowerCase().includes('no endpoints') || summary.toLowerCase().includes('no endpoints');
       if (is404 && consecutiveRateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
-        const failedProvider = rateLimitedProviderName || providerRouting?.order?.[0];
+        const failedProvider = rateLimitedProviderName || providerRouting?.only?.[0] || providerRouting?.order?.[0];
         if (failedProvider) {
           markProviderRateLimited(model, failedProvider, 60 * 60 * 1000); // blacklist 1h
           logger.log(`[AGENT] 404 "No endpoints" (provider=${failedProvider}) — blacklisted 1h, retrying`);
@@ -404,6 +460,11 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
     } else {
       currentModelHasCache = false;
     }
+    // Accumulate cost for this specific model (OpenRouter returns cost in usage.cost)
+    const iterCost: number = realUsage?.cost ?? 0;
+    if (iterCost > 0) {
+      sessionModelCosts[model] = (sessionModelCosts[model] ?? 0) + iterCost;
+    }
 
     // Send metrics update to UI
     const currentMetrics: any = {
@@ -413,7 +474,8 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       currentContextTokens: estInputTokens,
       contextLimit: modelContextLength || DEFAULT_CONTEXT_WINDOW,
       cachedTokens: currentModelHasCache ? sessionCachedTokens : 0,
-      model: model  // for webview model usage tracking
+      model: model,  // for webview model usage tracking
+      modelCosts: Object.keys(sessionModelCosts).length > 0 ? { ...sessionModelCosts } : undefined,
     };
     postMessage({
       type: 'metricsUpdate',
@@ -591,6 +653,7 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       }
 
       let args: any = {};
+      let argsWereRecovered = false;
       const rawArgs = toolCall.function.arguments || '{}';
       try {
         args = JSON.parse(rawArgs);
@@ -598,6 +661,9 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
       } catch (parseErr) {
         // Multi-stage JSON recovery for common model mistakes
         args = tryRecoverJSON(rawArgs, toolName, response.finish_reason);
+        if (args !== null) {
+          argsWereRecovered = true;
+        }
         if (args === null) {
           // Unrecoverable — if truncated, tell model to split content
           if (response.finish_reason === 'length') {
@@ -1061,11 +1127,11 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
 
       // Add tool result to conversation (with token-saving truncation)
       const rawResult = typeof result === 'string' ? result : JSON.stringify(result);
-      const MAX_TOOL_RESULT_CHARS = 12000; // ~3000 tokens max per tool result
+      const MAX_TOOL_RESULT_CHARS = 60000; // ~15000 tokens max per tool result
       // read_file gets a dynamic higher limit based on model context window.
       // Too-small limits force repeated reads and lead to bad edits/full rewrites.
       const readCtxWindow = Math.min(modelContextLength || DEFAULT_CONTEXT_WINDOW, MAX_EFFECTIVE_CONTEXT);
-      const readFileTokenBudget = Math.max(6000, Math.min(20000, Math.floor(readCtxWindow * 0.35)));
+      const readFileTokenBudget = Math.max(12000, Math.min(40000, Math.floor(readCtxWindow * 0.45)));
       const MAX_READ_FILE_CHARS = readFileTokenBudget * 4; // ~chars from tokens
       const effectiveMaxChars = (toolName === 'read_file') ? MAX_READ_FILE_CHARS : MAX_TOOL_RESULT_CHARS;
       let toolResultContent = rawResult;
@@ -1106,16 +1172,19 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
         content: toolResultContent
       });
 
-      // Warn model when create_file/edit_file was truncated by max_tokens
-      if (response.finish_reason === 'length' && (toolName === 'create_file' || toolName === 'edit_file')) {
+      // Warn model when create_file/edit_file was truncated by max_tokens OR by model silently cutting output
+      const isTruncatedByLength = response.finish_reason === 'length';
+      const isTruncatedSilently = argsWereRecovered && (toolName === 'create_file' || toolName === 'edit_file');
+      if ((isTruncatedByLength || isTruncatedSilently) && (toolName === 'create_file' || toolName === 'edit_file')) {
         const actualLines = result?.total_lines || 0;
-        const truncWarning = `\n\n\u26a0\ufe0f WARNING: Your response was TRUNCATED (finish_reason=length). ` +
+        const reason = isTruncatedByLength ? 'finish_reason=length' : 'model silently truncated tool args (malformed JSON recovered)';
+        const truncWarning = `\n\n\u26a0\ufe0f WARNING: Your output was TRUNCATED (${reason}). ` +
           `The content you tried to write was cut off mid-stream. ` +
-          `The file on disk may be INCOMPLETE (${actualLines} lines saved). ` +
+          `The file on disk is INCOMPLETE (${actualLines} lines saved). ` +
           `Do NOT assume the file has all the content you intended. ` +
           `NEXT STEP: Use read_file to check what was actually saved, then use multiple small edit_file calls to add the missing parts.`;
         conversationMessages[conversationMessages.length - 1].content += truncWarning;
-        logger.log(`[AGENT] Appended truncation warning for ${toolName} (finish_reason=length, ${actualLines} lines saved)`);
+        logger.log(`[AGENT] Appended truncation warning for ${toolName} (${reason}, ${actualLines} lines saved)`);
       }
 
       // Track create_file for delete+create cycle detection
@@ -1310,8 +1379,44 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
           const dropEnd = groups[numDrop - 1].end;
           const droppedMsgCount = dropEnd - dropStart;
 
+          // Build recovery summary BEFORE splice (while messages are still accessible)
+          const recoveryText = buildDroppedGroupsSummary(groups.slice(0, numDrop), conversationMessages, saved);
+
           // Splice out dropped groups (single operation, preserves remaining order)
           conversationMessages.splice(dropStart, droppedMsgCount);
+
+          // Reset context-size tracking — delta-estimation is invalid after splice.
+          // Next iteration will use full estimateTokenCount (slightly less efficient but correct).
+          messagesAtLastApiCall = 0;
+          lastKnownContextTokens = 0;
+
+          // Merge with any existing recovery message (cumulative history across multiple compressions)
+          let finalRecoveryContent = recoveryText;
+          let existingRecoveryIdx = -1;
+          for (let ri = dropStart - 1; ri >= 1; ri--) {
+            const m = conversationMessages[ri];
+            if (m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[CONTEXT RECOVERY')) {
+              existingRecoveryIdx = ri;
+              break;
+            }
+          }
+          if (existingRecoveryIdx >= 0) {
+            const oldContent = conversationMessages[existingRecoveryIdx].content as string;
+            const oldBullets = oldContent.split('\n').filter((l: string) => l.startsWith('\u2022')).join('\n');
+            const newBullets = recoveryText.split('\n').filter((l: string) => l.startsWith('\u2022')).join('\n');
+            finalRecoveryContent = [
+              '[CONTEXT RECOVERY (cumulative) — full history of completed actions:',
+              oldBullets,
+              newBullets,
+              'All above already done — do NOT repeat unless specifically needed.]'
+            ].join('\n');
+            conversationMessages.splice(existingRecoveryIdx, 1);
+            // existingRecoveryIdx < dropStart, so dropStart shifts by -1 after the removal
+            conversationMessages.splice(dropStart - 1, 0, { role: 'user', content: finalRecoveryContent });
+          } else {
+            conversationMessages.splice(dropStart, 0, { role: 'user', content: finalRecoveryContent });
+          }
+          logger.log(`[CACHE] Recovery message injected (${finalRecoveryContent.split('\n').length} lines)`);
 
           const afterSize = estimateTokenCount(conversationMessages);
           logger.log(
@@ -1380,7 +1485,8 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
         apiCalls: sessionApiCalls,
         currentContextTokens: lastKnownContextTokens,
         contextLimit: modelContextLength || DEFAULT_CONTEXT_WINDOW,
-        cachedTokens: currentModelHasCache ? sessionCachedTokens : 0
+        cachedTokens: currentModelHasCache ? sessionCachedTokens : 0,
+        modelCosts: Object.keys(sessionModelCosts).length > 0 ? { ...sessionModelCosts } : undefined,
     };
     postMessage({
       type: 'metricsUpdate',
@@ -1427,6 +1533,27 @@ Use reasoning ONLY for analysis. ALL tool invocations MUST go through the functi
 
   // Persist full conversation state (including tool calls) for next request
   onConversationUpdate?.(conversationMessages);
+
+  // Fetch OpenRouter account balance once per agent turn and push to UI
+  if (baseUrl.includes('openrouter.ai')) {
+    try {
+      const balRes = await fetch(`${baseUrl.replace(/\/+$/, '')}/credits`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (balRes.ok) {
+        const balData = await balRes.json();
+        const totalCredits = balData?.data?.total_credits;
+        const totalUsage = balData?.data?.total_usage ?? 0;
+        if (typeof totalCredits === 'number') {
+          const remaining = totalCredits - totalUsage;
+          postMessage({ type: 'balanceUpdate', balance: Math.max(0, remaining) });
+        }
+      }
+    } catch {
+      // Network error or non-OpenRouter provider — silently ignore
+    }
+  }
 
   return true;
 }

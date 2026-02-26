@@ -381,8 +381,6 @@
       let dashboard = document.getElementById('metrics-dashboard');
       if (!dashboard) return;
 
-
-
       const inputK = (metrics.inputTokens / 1000).toFixed(1);
       const outputK = (metrics.outputTokens / 1000).toFixed(1);
       const ctxK = (metrics.currentContextTokens / 1000).toFixed(1);
@@ -392,6 +390,25 @@
         ? `${(metrics.cachedTokens / 1000).toFixed(1)}K`
         : 'No';
       const cacheClass = metrics.cachedTokens !== undefined && metrics.cachedTokens > 0 ? '' : ' metrics-no-cache';
+
+      // Build per-model cost rows
+      let costRowsHtml = '';
+      if (metrics.modelCosts && typeof metrics.modelCosts === 'object') {
+        for (const [fullModel, cost] of Object.entries(metrics.modelCosts)) {
+          if (!cost || cost === 0) continue;
+          const shortName = fullModel.includes('/') ? fullModel.split('/').pop() : fullModel;
+          const costStr = cost < 0.001 ? `$${cost.toFixed(6)}` : `$${cost.toFixed(4)}`;
+          costRowsHtml += `
+        <div class="metrics-line metrics-cost-row" title="Стоимость запросов модели ${fullModel} в этой сессии">
+          <span class="metrics-key">${shortName}:</span>
+          <span class="metrics-value metrics-cost">${costStr}</span>
+        </div>`;
+        }
+      }
+
+      // Preserve current balance value if already shown
+      const prevBalRow = dashboard.querySelector('.metrics-balance-row');
+      const prevBalHtml = prevBalRow ? prevBalRow.outerHTML : '';
 
       dashboard.innerHTML = `
         <div class="metrics-line" title="Лимит итераций в сессии">
@@ -413,13 +430,29 @@
         <div class="metrics-line" title="Кэшированные токены (prompt cache hit)">
           <span class="metrics-key">Cache hit:</span>
           <span class="metrics-value${cacheClass}">${cacheDisplay}</span>
-        </div>
+        </div>${costRowsHtml}${prevBalHtml}
       `;
 
       if (metricsFabWrap) {
         metricsFabWrap.style.display = 'flex';
       }
     }
+
+    // ======== Balance Display ========
+    function updateBalanceDisplay(balance) {
+      const dashboard = document.getElementById('metrics-dashboard');
+      if (!dashboard) return;
+      let balRow = dashboard.querySelector('.metrics-balance-row');
+      if (!balRow) {
+        balRow = document.createElement('div');
+        balRow.className = 'metrics-line metrics-balance-row';
+        balRow.title = 'Текущий баланс OpenRouter';
+        dashboard.appendChild(balRow);
+      }
+      const balStr = typeof balance === 'number' ? `$${balance.toFixed(2)}` : '—';
+      balRow.innerHTML = `<span class="metrics-key">Balance:</span><span class="metrics-value">${balStr}</span>`;
+    }
+
 
     // ===== Session Switch Confirmation Dialog =====
     function showSessionSwitchDialog() {

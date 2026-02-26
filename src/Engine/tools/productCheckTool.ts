@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { logger } from '../../logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -283,6 +284,19 @@ export async function productCheckTool(args: any): Promise<ProductCheckResult> {
 
   logger.log(`[PRODUCT_CHECK] Browser found: ${browserPath}`);
   logger.log(`[PRODUCT_CHECK] URL: ${urlStr}, viewports: ${viewportsToCheck.map((v) => v.name).join(', ')}`);
+
+  // Auto-open the URL in the system default browser.
+  // This ensures dev servers (Vite, CRA, etc.) are awake and responsive before
+  // puppeteer navigates. Without this, a user who hasn't manually opened the page
+  // gets a timeout or empty DOM because the app hasn't hydrated yet.
+  try {
+    await vscode.env.openExternal(vscode.Uri.parse(urlStr));
+    // Give browser + server a moment to establish connection before headless audit
+    await new Promise((r) => setTimeout(r, 1500));
+    logger.log(`[PRODUCT_CHECK] Opened URL in default browser`);
+  } catch (e) {
+    logger.log(`[PRODUCT_CHECK] Could not auto-open browser (non-fatal): ${e}`);
+  }
 
   // ── Load puppeteer-core ────────────────────────────────────────────────
 
@@ -717,4 +731,7 @@ const TYPE_LABELS: Record<string, string> = {
   small_tap_target: 'Small Tap Target',
   heading_skip: 'Heading Level Skip',
   text_clipped: 'Text Clipped',
+  duplicate_id: 'Duplicate ID',
+  fixed_out_of_viewport: 'Fixed Element Out of Viewport',
+  empty_link: 'Empty Link',
 };
